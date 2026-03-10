@@ -1,0 +1,21 @@
+# Core scientific stack
+numpy>=1.24
+scipy>=1.10
+
+# JAX — install CPU or GPU variant as needed (see README)
+jax>=0.4.30
+jaxlib>=0.4.30
+equinox>=0.11
+optax>=0.2
+
+# Pyomo
+pyomo>=6.7
+
+# NLP solver interface
+cyipopt>=1.4
+
+# MPI (for parallel examples)
+mpi4py>=3.1
+
+# Plotting
+matplotlib>=3.7
