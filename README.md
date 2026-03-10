@@ -1,4 +1,4 @@
-# SiNDAE — A SImultaneous approach for training Neural Differential-Algebraic systems of Equations
+# SiNDAE — A Simultaneous approach for training Neural Differential-Algebraic systems of Equations
 
 This repository contains code associated with the paper [A simultaneous approach for training neural differential-algebraic systems of equations](https://arxiv.org/abs/2504.04665).
 
