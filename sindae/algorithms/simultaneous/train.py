@@ -112,7 +112,7 @@ def solve_simultaneous(
 
     # ── Helpers: configure and call solver ────────────────────────────────────
     def _solve_ipopt(extra_opts):
-        """ASL-based IPOPT: expression-writing path (no ExternalGreyBoxBlock)."""
+        """ASL-based POUNCE: expression-writing path (no ExternalGreyBoxBlock)."""
         ipopt = pyo.SolverFactory('ipopt')
         if ipopt_options:
             for k, v in ipopt_options.items():
@@ -125,7 +125,7 @@ def solve_simultaneous(
         timing = parse_ipopt_log(_log)
         os.unlink(_log)
         logger.info(
-            f"  IPOPT: {result.solver.status} / {result.solver.termination_condition}"
+            f"  POUNCE: {result.solver.status} / {result.solver.termination_condition}"
         )
         return result, timing
 
@@ -154,7 +154,7 @@ def solve_simultaneous(
             logger.info("=== Solving simultaneous GBM model (cyipopt, L-BFGS) ===")
             result, ipopt_timing = _solve_cyipopt({'hessian_approximation': 'limited-memory'})
         else:
-            logger.info("=== Solving simultaneous model (IPOPT, expr-writing) ===")
+            logger.info("=== Solving simultaneous model (POUNCE, expr-writing) ===")
             result, ipopt_timing = _solve_ipopt({})
     finally:
         timer.stop('solve')

@@ -12,3 +12,4 @@ plots/
 *.log
 .vscode/
 .idea/
+tests/

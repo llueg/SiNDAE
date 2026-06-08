@@ -4,30 +4,44 @@ This repository contains code associated with the paper [A simultaneous approach
 
 ## Installation
 
-### Optional: Create a conda environment
-
+### 1. Clone the Repo
 ```bash
-conda create -n sindae python=3.11
+git clone https://github.com/TODO/SiNDAE.git
+cd SiNDAE
+```
+
+### 2. Create environment
+
+Either, create conda environment (recommended):
+```bash
+conda env create -f environment.yml
 conda activate sindae
 ```
 
-### 1. Install IPOPT with HSL solvers
+or manually install pip dependencies
+```bash 
+pip install ".[full]"
+brew install open-mpi
+```
 
-The MA27 linear solver (from HSL) is required.  Obtain a licence and follow the [IPOPT HSL installation guide](https://coin-or.github.io/Ipopt/INSTALL.html).
 
-### 2. Install Python dependencies
+<!-- ### 1. Install IPOPT with HSL solvers
+
+The MA27 linear solver (from HSL) is required.  Obtain a licence and follow the [IPOPT HSL installation guide](https://coin-or.github.io/Ipopt/INSTALL.html). -->
+
+<!-- ### 2. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
-```
+``` -->
 
-### 3. Install SiNDAE
+<!-- ### 3. Install SiNDAE
 
 ```bash
 git clone https://github.com/TODO/SiNDAE.git
 cd SiNDAE
 pip install -e .
-```
+``` -->
 
 ## Examples
 

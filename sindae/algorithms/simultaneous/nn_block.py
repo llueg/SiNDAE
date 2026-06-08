@@ -11,14 +11,13 @@ from sindae.nn_utils import SimpleMLP, _act_jax2str, _act_str2jax
 
 def _act_str2pyo(activation: str) -> Callable:
     if activation == "tanh":
-        # pe.tanh writes AMPL opcode o37, which POUNCE does not implement.
-        # Equivalent identity using exp (o44), which all ASL solvers support.
-        return lambda x: 1 - 2 / (1 + pe.exp(2 * x))
+        return pe.tanh
+        # return lambda x: 1 - 2 / (1 + pe.exp(2 * x))
     elif activation == "softplus":
         return lambda x: pe.log(1 + pe.exp(x))
     elif activation == "swish":
-        # swish(x) = x * sigmoid(x); avoid pe.tanh which triggers o37 in POUNCE.
-        return lambda x: x / (1 + pe.exp(-x))
+        return lambda x: 0.5 * x * pe.tanh(0.5 * x) + 0.5 * x
+        # return lambda x: x / (1 + pe.exp(-x))
     elif activation is None:
         return lambda x: x
     else:

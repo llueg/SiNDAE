@@ -1,6 +1,7 @@
 from enum import Enum
 import copy
 import logging
+import os
 from unittest.mock import patch
 
 import jax
@@ -11,6 +12,9 @@ import pytest
 import numpy as np
 import pyomo.environ as pyo
 from dataclasses import dataclass
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 from sindae.nn_utils import SimpleMLP
 from sindae import generate_data
@@ -20,6 +24,7 @@ from sindae.algorithms.pretrain import PretrainConfig, pretrain_mlp
 from sindae.algorithms.decomp.train import DecompConfig, train_decomp
 from sindae.algorithms.simultaneous.train import solve_simultaneous
 from sindae.algorithms.simultaneous.model_builder import extract_mlp
+from sindae.plot_utils import plot_instance_data
 
 from sindae.example_problems import FourTankProblem, FedBatchBioreactorProblem, LeslieGowerProblem
 
@@ -27,6 +32,32 @@ logger = logging.getLogger(__name__)
 
 X_TOL = 1e-3
 Z_TOL = 1e-3
+
+_PLOTS_DIR = os.path.join(os.path.dirname(__file__), 'plots')
+
+# Variable names for each problem, keyed by Configs member name.
+_PLOT_NAMES = {
+    'four_tank': {
+        'inputs':  ['x0', 'x1', 'x2', 'x3'],
+        'outputs': ['z0', 'z1'],
+    },
+    'leslie_gower': {
+        'inputs':  ['x0', 'x1'],
+        'outputs': ['z0'],
+    },
+    'fedbatch': {
+        'inputs':  ['x0', 'x1', 'x2', 'x3'],
+        'outputs': ['z0'],
+    },
+}
+
+# color = solver, linestyle = hessian approximation
+_SOLVER_STYLES = {
+    ('ipopt',  'exact'):          {'color': 'C0', 'ls': '-',  'lw': 2.0},
+    ('pounce', 'exact'):          {'color': 'C1', 'ls': '-',  'lw': 2.0},
+    ('ipopt',  'limited-memory'): {'color': 'C0', 'ls': '--', 'lw': 1.5, 'alpha': 0.7},
+    ('pounce', 'limited-memory'): {'color': 'C1', 'ls': '--', 'lw': 1.5, 'alpha': 0.7},
+}
 
 @dataclass
 class TestConfig:
@@ -244,6 +275,53 @@ def solve_simultaneous_with(
     return trained_m, trained_mlp, instance_data
 
 
+def _save_comparison_plots(config_name, plot_results):
+    """
+    Save a trajectory comparison figure for one problem config.
+
+    Parameters
+    ----------
+    config_name : str
+        Key into _PLOT_NAMES (e.g. 'four_tank').
+    plot_results : dict
+        { hess_approx: { solver_name: InstanceData | None } }
+    """
+    os.makedirs(_PLOTS_DIR, exist_ok=True)
+    names = _PLOT_NAMES[config_name]
+
+    datasets = []
+    for hess_approx in ['exact', 'limited-memory']:
+        solver_results = plot_results.get(hess_approx, {})
+        hess_label = 'exact' if hess_approx == 'exact' else 'L-BFGS'
+        for solver_name in ['ipopt', 'pounce']:
+            data = solver_results.get(solver_name)
+            if data is None:
+                continue
+            label = f'{solver_name} ({hess_label})'
+            style = dict(_SOLVER_STYLES.get((solver_name, hess_approx), {}))
+            datasets.append((data, label, style))
+
+    if not datasets:
+        logger.warning(f"  No data to plot for {config_name}")
+        return
+
+    fig, _ = plot_instance_data(
+        datasets=datasets,
+        nn_input_names=names['inputs'],
+        nn_output_names=names['outputs'],
+        groups=['inputs', 'outputs'],
+        legend_placement='last',
+        legend_kwargs={'fontsize': 10},
+    )
+    title = config_name.replace('_', ' ').title()
+    fig.suptitle(f'{title}: IPOPT vs POUNCE', y=1.01, fontsize=13)
+
+    out_path = os.path.join(_PLOTS_DIR, f'pounce_vs_ipopt_{config_name}.png')
+    fig.savefig(out_path, bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    logger.info(f"  Plot saved → {out_path}")
+
+
 # Test case to solve all three problems with ipopt/pounce and check results match.
 def test_pounce_matches_ipopt_simultaneous():
     """
@@ -259,11 +337,12 @@ def test_pounce_matches_ipopt_simultaneous():
         logger.info(f"{'='*80}")
         
         test_config = config_enum.value
-        
+
         # Only test with use_gbm=False (expr-writing)
         # For GBM (use_gbm=True), cyipopt is required and pounce cannot be used
         use_gbm = False
-        
+        config_plot_results = {}
+
         for hess_approx in ['exact', 'limited-memory']:
             logger.info(f"\n  Testing use_gbm={use_gbm}, hess_approx='{hess_approx}'")
             
@@ -277,16 +356,19 @@ def test_pounce_matches_ipopt_simultaneous():
             
             if ref_data is None:
                 logger.info(f"    Skipped ipopt due to incompatible settings")
+                config_plot_results[hess_approx] = {'ipopt': None, 'pounce': None}
                 continue
-            
+
             # Solve with pounce
             pounce_m, pounce_mlp, pounce_data = solve_simultaneous_with(
-                test_config, 
-                'pounce', 
-                use_gbm, 
+                test_config,
+                'pounce',
+                use_gbm,
                 hess_approx
             )
-            
+
+            config_plot_results[hess_approx] = {'ipopt': ref_data, 'pounce': pounce_data}
+
             if pounce_data is None:
                 logger.info(f"    Skipped pounce due to incompatible settings")
                 continue
@@ -326,6 +408,7 @@ def test_pounce_matches_ipopt_simultaneous():
             logger.info(f"    ✓ PASSED: {config_enum.name} with use_gbm={use_gbm}, hess_approx='{hess_approx}'")
     
         logger.info(f"\n✓ All tests passed for {config_enum.name}")
+        _save_comparison_plots(config_enum.name, config_plot_results)
 
 
 def relative_rmse(ref, other):
