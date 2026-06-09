@@ -181,7 +181,7 @@ def solve_smoother(
                              )
     timer.stop('build')
 
-    ipopt = pyo.SolverFactory('ipopt')
+    ipopt = pyo.SolverFactory('pounce')
     if ipopt_options:
         for k, v in ipopt_options.items():
             ipopt.options[k] = v

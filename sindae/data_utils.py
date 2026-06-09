@@ -221,7 +221,7 @@ def generate_data(
     m.obj = pyo.Objective(expr=0.0)
 
     # ── Solve ─────────────────────────────────────────────────────────────────
-    ipopt = pyo.SolverFactory('ipopt')
+    ipopt = pyo.SolverFactory('pounce')
     if ipopt_options:
         for k, v in ipopt_options.items():
             ipopt.options[k] = v

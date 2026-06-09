@@ -17,6 +17,7 @@ Either, create conda environment (recommended):
 conda env create -f environment.yml
 conda activate sindae
 ```
+There may be several warnings from your OS as the ASL solver binaries are installed.
 
 or manually install pip dependencies
 ```bash 

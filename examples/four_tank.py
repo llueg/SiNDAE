@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-METHOD   = 'simul'   # 'decomp' | 'simul'
+METHOD   = 'decomp'   # 'decomp' | 'simul'
 # simul options
 USE_GBM  = False       # simul only — whether to use GBM in simultaneous training;
 HESS_APPROX = 'limited-memory' # alternatively, 'exact'

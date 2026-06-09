@@ -38,7 +38,7 @@ import jax.numpy as jnp
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
-from pyomo.contrib.interior_point.linalg.ma27_interface import InteriorPointMA27Interface
+from pyomo.contrib.interior_point.linalg.scipy_interface import ScipyInterface
 
 import sindae.algorithms.decomp.kkt_utils as dutils
 from sindae.algorithms.model_builder_utils import NORM_INPUT_NAME, NORM_OBS_NAME
@@ -108,7 +108,7 @@ class TrajectoryBatchSubproblem:
         if cyipopt_options:
             for k, v in cyipopt_options.items():
                 self._solver.config.options[k] = v
-        self._linear_solver = InteriorPointMA27Interface()
+        self._linear_solver = ScipyInterface()
         self._symbolic_done = False
 
         self._extended_nlp = None

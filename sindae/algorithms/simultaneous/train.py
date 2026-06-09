@@ -9,7 +9,7 @@ jointly in a single solve — no outer training loop required.
 
 Two sub-approaches are supported (controlled by ``use_gbm``):
   False (default) : expression-writing — NNBlock, exact Hessian available
-                    → solved with ``SolverFactory('ipopt')`` (ASL interface)
+                    → solved with ``SolverFactory('pounce')`` (ASL interface)
   True            : grey-box (NNSimulGreyBoxModel) — requires L-BFGS
                     → solved with ``SolverFactory('cyipopt')`` (needed for
                        ExternalGreyBoxBlock; standard IPOPT cannot handle it)
@@ -113,7 +113,7 @@ def solve_simultaneous(
     # ── Helpers: configure and call solver ────────────────────────────────────
     def _solve_ipopt(extra_opts):
         """ASL-based POUNCE: expression-writing path (no ExternalGreyBoxBlock)."""
-        ipopt = pyo.SolverFactory('ipopt')
+        ipopt = pyo.SolverFactory('pounce')
         if ipopt_options:
             for k, v in ipopt_options.items():
                 ipopt.options[k] = v
