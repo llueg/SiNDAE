@@ -27,7 +27,8 @@ dependencies = [
     "equinox>=0.11",
     "optax>=0.2",
     "pyomo>=6.7",
-    "pounce-solver>=0.3",
+    "pounce-solver>=0.4",
+    "feral-solver>=0.9",
     "matplotlib>=3.7",
 ]
 

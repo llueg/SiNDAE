@@ -15,6 +15,9 @@ pyomo>=6.7
 cyipopt>=1.4
 pounce-solver>=0.4
 
+# Sparse symmetric KKT linear solver for the decomp approach (MA27 replacement)
+feral-solver>=0.9
+
 # MPI (for parallel examples)
 mpi4py>=3.1
 

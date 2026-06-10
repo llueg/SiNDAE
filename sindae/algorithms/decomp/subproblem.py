@@ -39,6 +39,7 @@ import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
 from pyomo.contrib.interior_point.linalg.scipy_interface import ScipyInterface
+from sindae.interfaces.feral_interface import FeralInterface
 
 import sindae.algorithms.decomp.kkt_utils as dutils
 from sindae.algorithms.model_builder_utils import NORM_INPUT_NAME, NORM_OBS_NAME
@@ -108,7 +109,7 @@ class TrajectoryBatchSubproblem:
         if cyipopt_options:
             for k, v in cyipopt_options.items():
                 self._solver.config.options[k] = v
-        self._linear_solver = ScipyInterface()
+        self._linear_solver = FeralInterface()
         self._symbolic_done = False
 
         self._extended_nlp = None
@@ -271,7 +272,7 @@ class TrajectoryBatchSubproblem:
 
         First call: builds PyomoNLPWithGreyBoxBlocksExtended (computes sparsity).
         Subsequent calls: swap inner NLP only (reuse sparsity maps).
-        Symbolic factorization of MA27 done exactly once.
+        Symbolic factorization of the KKT linear solver done exactly once.
         """
         def _t(name): return timer.start(name) if timer else None
         def _s(name): return timer.stop(name)  if timer else None

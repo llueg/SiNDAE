@@ -23,4 +23,7 @@ dependencies:
     - optax>=0.2
     - pyomo>=6.7
     - pounce-solver>=0.4
+    # feral: pure-Rust LDL^T linear solver for the decomp KKT systems
+    # (MA27 replacement, no HSL license needed)
+    - feral-solver>=0.9
     - -e .

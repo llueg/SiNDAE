@@ -13,3 +13,5 @@ plots/
 .vscode/
 .idea/
 tests/
+.claude/
+.pytest_cache/
