@@ -1,0 +1,63 @@
+# Jupyter Book configuration — https://jupyterbook.org/customize/config.html
+title: SiNDAE
+author: Laurens Lueg, Nicolas Smits
+copyright: "2025"
+logo: ""
+
+# Only render files listed in _toc.yml (hides CLAUDE.md and other stray files)
+only_build_toc_files: true
+
+execute:
+  execute_notebooks: "off"
+
+parse:
+  myst_enable_extensions:
+    - amsmath
+    - colon_fence
+    - deflist
+    - dollarmath
+    - html_image
+
+html:
+  use_repository_button: false
+  use_issues_button: false
+  use_edit_page_button: false
+  home_page_in_navbar: true
+
+sphinx:
+  extra_extensions:
+    - sphinx.ext.autodoc
+    - sphinx.ext.napoleon
+    - sphinx.ext.viewcode
+    - sphinxcontrib.bibtex
+  config:
+    bibtex_bibfiles:
+      - references.bib
+    bibtex_style: unsrt
+    bibtex_reference_style: author_year
+    # Autodoc settings
+    autodoc_typehints: description
+    autodoc_member_order: bysource
+    autodoc_default_options:
+      members: true
+      undoc-members: false
+      show-inheritance: true
+    # Napoleon (NumPy/Google docstring parser)
+    napoleon_numpy_docstring: true
+    napoleon_google_docstring: false
+    napoleon_use_param: true
+    napoleon_use_returns: true
+    napoleon_use_rtype: false
+    # Mock heavy dependencies so autodoc works without a full install
+    autodoc_mock_imports:
+      - pyomo
+      - pyomo.environ
+      - pyomo.dae
+      - pyomo.contrib
+      - jax
+      - jaxlib
+      - equinox
+      - optax
+      - mpi4py
+      - cyipopt
+      - pounce

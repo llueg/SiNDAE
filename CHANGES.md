@@ -98,26 +98,3 @@ The two are complementary: the direct test is the sharp correctness check
 solver-vs-solver consistency through 300+ optimizer steps, so its RMSE
 reflects optimization-path divergence as much as solver accuracy and its
 tolerance is intentionally loose.
-
-## 5. Fixes made while double-checking
-
-- `feral-solver` was missing from all three dependency files even though
-  `subproblem.py` imports it unconditionally — added (`>=0.9`).
-- `pyproject.toml` pinned `pounce-solver>=0.3` while `environment.yml` and
-  `requirements.txt` had `>=0.4` — aligned to `>=0.4` (activation-function
-  support landed in 0.4).
-- The swap-in test still patched `subproblem.ScipyInterface` after the code
-  switched to instantiating `FeralInterface()` — the patch had become a
-  no-op, so every "solver variant" would silently have run feral and the test
-  would trivially pass. Patch target updated to `subproblem.FeralInterface`.
-- Stale docstring in `subproblem.py` ("Symbolic factorization of MA27 done
-  exactly once") updated.
-
-## Caveats
-
-- FERAL is research-grade, pre-1.0 (self-described). The swap-in tests are
-  the guard; keep an eye on `solve_failed` warnings from `kkt_utils`.
-- POUNCE follows upstream Ipopt's algorithm and options but is also pre-1.0;
-  the swap-in test pins agreement at 1e-3 rel-RMSE.
-- `SolverFactory('pounce')` requires the `pounce` executable on `PATH` —
-  fresh shells/CI need the environment's `bin` directory active.

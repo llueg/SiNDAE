@@ -1,0 +1,4 @@
+# Docs build dependencies (install in the same environment as sindae)
+jupyter-book>=1.0
+sphinxcontrib-bibtex>=2.6
+sphinx-autodoc-typehints>=1.25

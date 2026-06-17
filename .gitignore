@@ -15,3 +15,7 @@ plots/
 tests/
 .claude/
 .pytest_cache/
+CHANGES.md
+
+# MyST build outputs
+_build

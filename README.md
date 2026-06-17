@@ -2,28 +2,6 @@
 
 This repository contains code associated with the paper [A simultaneous approach for training neural differential-algebraic systems of equations](https://arxiv.org/abs/2504.04665).
 
-## Installation
-
-### 1. Clone the Repo
-```bash
-git clone https://github.com/TODO/SiNDAE.git
-cd SiNDAE
-```
-
-### 2. Create environment
-
-Either, create conda environment (recommended):
-```bash
-conda env create -f environment.yml
-conda activate sindae
-```
-There may be several warnings from your OS as the ASL solver binaries are installed.
-
-or manually install pip dependencies
-```bash 
-pip install ".[full]"
-brew install open-mpi
-```
 
 
 <!-- ### 1. Install IPOPT with HSL solvers
