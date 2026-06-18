@@ -57,7 +57,7 @@ trained_m, mlp = solve_simultaneous(
     smoother_model=smoother_m,    # warm-start (optional but recommended)
     use_gbm=False,                # expression-writing (exact Hessian)
     reg_coef=1e-3,                # L2 regularization on NN weights
-    ipopt_options={
+    pounceoptions={
         'tol': 1e-6,
         'max_iter': 1000,
     },

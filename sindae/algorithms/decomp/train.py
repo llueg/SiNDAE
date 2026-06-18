@@ -213,7 +213,7 @@ def train_decomp(
     data_fit_history     = []
     grad_norm_history    = []
     diag_history         = []
-    ipopt_timing_history = []
+    pouncetiming_history = []
 
     timer = HierarchicalTimer()
     timer.start('training')
@@ -317,7 +317,7 @@ def train_decomp(
             _entry = dict(sub._last_solve_info)
             _entry['wall_step']  = _wall_step
             _entry['wall_solve'] = _wall_solve
-            ipopt_timing_history.append(_entry)
+            pouncetiming_history.append(_entry)
 
         if is_root and step % 10 == 0:
             raw_norm = grad_norm / max(len(flat_params), 1)
@@ -348,5 +348,5 @@ def train_decomp(
         'data_fit_history':     data_fit_history,
         'grad_norm_history':    grad_norm_history,
         'diag_history':         diag_history,
-        'ipopt_timing_history': ipopt_timing_history,
+        'pouncetiming_history': pouncetiming_history,
     }

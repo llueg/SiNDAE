@@ -165,7 +165,7 @@ def generate_data(
     obs_every: int = 1,
     seed: int = 0,
     noise_std: Optional[np.ndarray] = None,
-    ipopt_options: Optional[dict] = None,
+    pounceoptions: Optional[dict] = None,
     tee: bool = False,
 ) -> InstanceData:
     """
@@ -189,7 +189,7 @@ def generate_data(
         1 = observe at all collocation points (default).
     seed        : int
         RNG seed for reproducible noise.
-    ipopt_options : dict, optional
+    pounceoptions : dict, optional
         Extra IPOPT options, e.g. {'tol': 1e-9}.
     tee         : bool
         Pass through to IPOPT solver (print output if True).
@@ -222,8 +222,8 @@ def generate_data(
 
     # ── Solve ─────────────────────────────────────────────────────────────────
     ipopt = pyo.SolverFactory('pounce')
-    if ipopt_options:
-        for k, v in ipopt_options.items():
+    if pounceoptions:
+        for k, v in pounceoptions.items():
             ipopt.options[k] = v
     try:
         result = ipopt.solve(m, tee=tee)

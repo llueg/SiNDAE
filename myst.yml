@@ -8,6 +8,8 @@ project:
   authors:
     - name: Laurens Lueg
     - name: Nicolas Smits
+  bibliography:
+    - docs/references.bib
   exclude:
     - CLAUDE.md
     - CHANGES.md
@@ -36,6 +38,7 @@ project:
     - title: Examples
       children:
         - file: docs/examples_gallery/index.md
+        - file: docs/examples_gallery/four_tank_example.ipynb
     - file: docs/bibliography.md
 
 site:

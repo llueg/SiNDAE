@@ -20,3 +20,4 @@ from sindae.algorithms.simultaneous.model_builder import extract_mlp as extract_
 from sindae.algorithms.simultaneous.train import solve_simultaneous as solve_simultaneous
 from sindae.algorithms.inference import make_inference_model as make_inference_model
 from sindae.algorithms.inference import solve_inference as solve_inference
+from sindae.plot_utils import plot_instance_data, plot_training_history

@@ -23,7 +23,7 @@ from typing import List, Optional, Tuple
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
 
-from sindae.algorithms.timing_utils import tmp_log_path, parse_ipopt_log, set_output_file
+from sindae.algorithms.timing_utils import tmp_log_path, parse_pounce_log, set_output_file
 
 from sindae.data_utils import InstanceData
 from sindae.nn_utils import SimpleMLP
@@ -45,7 +45,7 @@ def solve_simultaneous(
     smoother_model: Optional[pyo.ConcreteModel] = None,
     use_gbm: bool = False,
     reg_coef: float = 0.0,
-    ipopt_options: Optional[dict] = None,
+    pounceoptions: Optional[dict] = None,
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
@@ -69,7 +69,7 @@ def solve_simultaneous(
         True:            grey-box (NNSimulGreyBoxModel), requires L-BFGS.
     reg_coef       : float
         L2 regularisation coefficient on NN parameters.
-    ipopt_options  : dict, optional
+    pounceoptions  : dict, optional
         Extra IPOPT options, e.g. ``{'max_iter': 500, 'tol': 1e-6,
         'hessian_approximation': 'limited-memory'}``.
 
@@ -114,15 +114,15 @@ def solve_simultaneous(
     def _solve_ipopt(extra_opts):
         """ASL-based POUNCE: expression-writing path (no ExternalGreyBoxBlock)."""
         ipopt = pyo.SolverFactory('pounce')
-        if ipopt_options:
-            for k, v in ipopt_options.items():
+        if pounceoptions:
+            for k, v in pounceoptions.items():
                 ipopt.options[k] = v
         for k, v in extra_opts.items():
             ipopt.options[k] = v
         _log = tmp_log_path()
         set_output_file(ipopt, _log)
         result = ipopt.solve(m, tee=tee)
-        timing = parse_ipopt_log(_log)
+        timing = parse_pounce_log(_log)
         os.unlink(_log)
         logger.info(
             f"  POUNCE: {result.solver.status} / {result.solver.termination_condition}"
@@ -132,15 +132,15 @@ def solve_simultaneous(
     def _solve_cyipopt(extra_opts):
         """cyipopt: GBM path (required for ExternalGreyBoxBlock)."""
         solver = pyo.SolverFactory('cyipopt')
-        if ipopt_options:
-            for k, v in ipopt_options.items():
+        if pounceoptions:
+            for k, v in pounceoptions.items():
                 solver.config.options[k] = v
         for k, v in extra_opts.items():
             solver.config.options[k] = v
         _log = tmp_log_path()
         set_output_file(solver, _log, is_cyipopt=True)
         result = solver.solve(m, tee=tee)
-        timing = parse_ipopt_log(_log)
+        timing = parse_pounce_log(_log)
         os.unlink(_log)
         logger.info(
             f"  cyipopt: {result.solver.status} / {result.solver.termination_condition}"
@@ -152,15 +152,15 @@ def solve_simultaneous(
     try:
         if use_gbm:
             logger.info("=== Solving simultaneous GBM model (cyipopt, L-BFGS) ===")
-            result, ipopt_timing = _solve_cyipopt({'hessian_approximation': 'limited-memory'})
+            result, pouncetiming = _solve_cyipopt({'hessian_approximation': 'limited-memory'})
         else:
             logger.info("=== Solving simultaneous model (POUNCE, expr-writing) ===")
-            result, ipopt_timing = _solve_ipopt({})
+            result, pouncetiming = _solve_ipopt({})
     finally:
         timer.stop('solve')
 
     m._solver_result = result
-    m._ipopt_timing  = ipopt_timing
+    m._pouncetiming  = pouncetiming
 
     # ── Extract trained MLP ────────────────────────────────────────────────────
     trained_mlp = extract_mlp(m)

@@ -14,7 +14,7 @@ API
   build_smoother_model(problem, mlp, traj_indices, smooth_coef=1.0) -> ConcreteModel
 
   solve_smoother(problem, mlp, traj_indices=None, smooth_coef=1.0,
-                 ipopt_options=None) -> ConcreteModel
+                 pounceoptions=None) -> ConcreteModel
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from pyomo.common.timing import HierarchicalTimer
 
 from sindae.nn_utils import SimpleMLP
 from sindae.problem import ProblemDefinition
-from sindae.algorithms.timing_utils import tmp_log_path, parse_ipopt_log, set_output_file
+from sindae.algorithms.timing_utils import tmp_log_path, parse_pounce_log, set_output_file
 from sindae.algorithms.model_builder_utils import (
     Z_SMOOTH_NAME,
     Z_SMOOTH_DERIV_NAME,
@@ -144,7 +144,7 @@ def solve_smoother(
     mlp: SimpleMLP,
     traj_indices: Optional[List[int]] = None,
     smooth_coef: float = 1.0,
-    ipopt_options: Optional[dict] = None,
+    pounceoptions: Optional[dict] = None,
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
 ) -> pyo.ConcreteModel:
@@ -157,7 +157,7 @@ def solve_smoother(
     mlp           : SimpleMLP          (used for out_size only)
     traj_indices  : List[int], optional  (default: all trajectories)
     smooth_coef   : float
-    ipopt_options : dict, optional  (e.g. ``{'tol': 1e-6, 'max_iter': 500}``)
+    pounceoptions : dict, optional  (e.g. ``{'tol': 1e-6, 'max_iter': 500}``)
 
     Returns
     -------
@@ -182,8 +182,8 @@ def solve_smoother(
     timer.stop('build')
 
     ipopt = pyo.SolverFactory('pounce')
-    if ipopt_options:
-        for k, v in ipopt_options.items():
+    if pounceoptions:
+        for k, v in pounceoptions.items():
             ipopt.options[k] = v
     _log = tmp_log_path()
     set_output_file(ipopt, _log)
@@ -193,7 +193,7 @@ def solve_smoother(
     timer.stop('solve')
 
     m._solver_result = result
-    m._ipopt_timing  = parse_ipopt_log(_log)
+    m._pouncetiming  = parse_pounce_log(_log)
     os.unlink(_log)
     logger.info(
         f"  Smoother: {result.solver.status} / {result.solver.termination_condition}"

@@ -100,7 +100,7 @@ trained_m, mlp = solve_simultaneous(
     data=smoother_data,
     smoother_model=smoother_m,  # warm-start from smoother
     reg_coef=1e-3,
-    ipopt_options={'tol': 1e-6, 'max_iter': 1000},
+    pounceoptions={'tol': 1e-6, 'max_iter': 1000},
 )
 ```
 

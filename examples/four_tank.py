@@ -70,9 +70,9 @@ decomp_cfg = DecompConfig(
 # cyipopt options for subproblem solutions
 decomp_cyipopt = {}
 
-# if exact Hessian desired, disable USE_GBM and set hessian_approximation to 'exact' in simul_ipopt options
+# if exact Hessian desired, disable USE_GBM and set hessian_approximation to 'exact' in simul_pounce options
 # Ipopt options for simultaneous training 
-simul_ipopt  = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
+simul_pounce  = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
 
 _STATE_NAMES  = ['$x_0$', '$x_1$', '$x_2$', '$x_3$']
 _OUTPUT_NAMES = ['$z_0$', '$z_1$']
@@ -129,7 +129,7 @@ elif METHOD == 'simul':
         problem=problem, mlp=mlp,
         data=smoother_data, smoother_model=smoother_m,
         use_gbm=USE_GBM, reg_coef=REG_COEF,
-        ipopt_options=simul_ipopt, tee=True,
+        pounceoptions=simul_pounce, tee=True,
     )
 
 else:

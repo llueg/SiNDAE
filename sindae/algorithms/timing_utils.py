@@ -17,12 +17,12 @@ API
   tmp_log_path() -> str
       Return a fresh temp-file path suitable for ``output_file``.
 
-  parse_ipopt_log(path) -> dict
-      Parse ``ipopt_only``, ``nlp_evals`` timing (seconds) and ``n_iter``
+  parse_pounce_log(path) -> dict
+      Parse ``pounceonly``, ``nlp_evals`` timing (seconds) and ``n_iter``
       from a log.  Returns None for any value that is not found (e.g. solve
       did not complete, or a very old IPOPT version).
 
-  capture_ipopt_timing(solver, is_cyipopt=False) -> (path, cleanup)
+  capture_pouncetiming(solver, is_cyipopt=False) -> (path, cleanup)
       Context-manager-free helper: sets output_file on the solver and
       returns the log path.  Caller must call cleanup() after parsing.
 """
@@ -48,23 +48,23 @@ _ITER_RE = re.compile(
 
 def tmp_log_path() -> str:
     """Return a new temp file path (not yet written to) for IPOPT log output."""
-    fd, path = tempfile.mkstemp(suffix='.log', prefix='ipopt_')
+    fd, path = tempfile.mkstemp(suffix='.log', prefix='pounce')
     os.close(fd)
     return path
 
 
-def parse_ipopt_log(path: str) -> dict:
+def parse_pounce_log(path: str) -> dict:
     """
     Parse IPOPT internal timing and iteration count from a log file.
 
     Returns
     -------
     dict with keys:
-      'ipopt_only' : float or None  — seconds in IPOPT excluding NLP evals
+      'pounceonly' : float or None  — seconds in IPOPT excluding NLP evals
       'nlp_evals'  : float or None  — seconds in NLP function evaluations
       'n_iter'     : int or None    — number of IPOPT iterations
     """
-    ipopt_only: Optional[float] = None
+    pounceonly: Optional[float] = None
     nlp_evals:  Optional[float] = None
     n_iter:     Optional[int]   = None
     last_lgrg:  Optional[str]   = None   # lg(rg) value at the last iteration
@@ -77,7 +77,7 @@ def parse_ipopt_log(path: str) -> dict:
                     line,
                 )
                 if m:
-                    ipopt_only = float(m.group(1))
+                    pounceonly = float(m.group(1))
 
                 m = re.search(
                     r'Total (?:seconds|CPU secs) in NLP function evaluations\s*=\s*([\d.]+)',
@@ -97,7 +97,7 @@ def parse_ipopt_log(path: str) -> dict:
         pass
 
     return {
-        'ipopt_only': ipopt_only,
+        'pounceonly': pounceonly,
         'nlp_evals':  nlp_evals,
         'n_iter':     n_iter,
         'last_lgrg':  last_lgrg,
@@ -109,7 +109,7 @@ def set_output_file(solver, path: str, is_cyipopt: bool = False) -> None:
 
     ``print_timing_statistics=yes`` is required for IPOPT to emit the
     ``Total seconds in IPOPT`` / ``Total seconds in NLP function evaluations``
-    lines that ``parse_ipopt_log`` looks for.
+    lines that ``parse_pounce_log`` looks for.
     """
     if is_cyipopt:
         solver.config.options['output_file'] = path

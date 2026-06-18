@@ -22,4 +22,5 @@ chapters:
   - caption: Examples
     chapters:
       - file: examples_gallery/index
+      - file: examples_gallery/four_tank_example
   - file: bibliography

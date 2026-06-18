@@ -67,7 +67,7 @@ decomp_cfg = DecompConfig(
 decomp_cyipopt = dict(tol=1e-6, max_iter=500, mu_init=1e-4)
 
 # Ipopt options for simultaneous training
-simul_ipopt = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
+simul_pounce = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
 
 _STATE_NAMES  = ['$X$', '$P$', '$S$', '$V$']
 _OUTPUT_NAMES = [r'$\mu$']
@@ -124,7 +124,7 @@ elif METHOD == 'simul':
         problem=problem, mlp=mlp,
         data=smoother_data, smoother_model=smoother_m,
         use_gbm=USE_GBM, reg_coef=REG_COEF,
-        ipopt_options=simul_ipopt, tee=True,
+        pounceoptions=simul_pounce, tee=True,
     )
 
 else:

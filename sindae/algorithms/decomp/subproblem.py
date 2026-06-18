@@ -43,7 +43,7 @@ from sindae.interfaces.feral_interface import FeralInterface
 
 import sindae.algorithms.decomp.kkt_utils as dutils
 from sindae.algorithms.model_builder_utils import NORM_INPUT_NAME, NORM_OBS_NAME
-from sindae.algorithms.timing_utils import parse_ipopt_log, set_output_file, tmp_log_path
+from sindae.algorithms.timing_utils import parse_pounce_log, set_output_file, tmp_log_path
 from sindae.interfaces.interior_point_compat import InteriorPointInterface
 from sindae.interfaces.pyomo_grey_box_nlp_extended import PyomoNLPWithGreyBoxBlocksExtended
 
@@ -90,7 +90,7 @@ class TrajectoryBatchSubproblem:
         mu_target=1e-10,
         slack_coef=1.0,
         subsample_frac=1.0,
-        cyipopt_options=None,
+        cypounceoptions=None,
     ):
         self._model         = model
         self._gbm           = gbm
@@ -170,7 +170,7 @@ class TrajectoryBatchSubproblem:
         _log = tmp_log_path()
         set_output_file(self._solver, _log, is_cyipopt=True)
         _result, solved_nlp = self._solver.solve(self._model, return_nlp=True)
-        self._last_solve_info = parse_ipopt_log(_log)
+        self._last_solve_info = parse_pounce_log(_log)
         os.unlink(_log)
         _lgrg = self._last_solve_info.get('last_lgrg')
         if _lgrg is not None and _lgrg != '-':

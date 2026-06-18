@@ -4,7 +4,7 @@ inference.py
 Embed a trained MLP into a new problem as a hard GBM constraint and solve.
 
 No data-fit objective.  When ``slack_coef=0`` (default) the NN equality is
-enforced as a hard GBM output constraint — the system is square and IPOPT
+enforced as a hard GBM output constraint — the system is square and POUNCE
 finds the unique feasible trajectory.
 
 When ``slack_coef > 0`` the constraint is relaxed via ℓ₁ slack variables
@@ -37,7 +37,7 @@ from typing import List, Optional
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
 
-from sindae.algorithms.timing_utils import tmp_log_path, parse_ipopt_log, set_output_file
+from sindae.algorithms.timing_utils import tmp_log_path, parse_pounce_log, set_output_file
 from pyomo.contrib.pynumero.interfaces.external_grey_box import ExternalGreyBoxBlock
 
 from sindae.data_utils import InstanceData
@@ -247,7 +247,7 @@ def solve_inference(
     timer.stop('solve')
 
     m._solver_result = result
-    m._ipopt_timing  = parse_ipopt_log(_log)
+    m._pouncetiming  = parse_pounce_log(_log)
     os.unlink(_log)
     logger.info(
         f"  Inference: {result.solver.status} / {result.solver.termination_condition}"
