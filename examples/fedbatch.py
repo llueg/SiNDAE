@@ -22,7 +22,7 @@ from sindae.data_utils import extract_instance_data, InstanceData
 from sindae.algorithms.smoother import solve_smoother
 from sindae.algorithms.pretrain import PretrainConfig, pretrain_mlp
 from sindae.algorithms.decomp.train import DecompConfig, train_decomp
-from sindae.algorithms.simultaneous.train import solve_simultaneous
+from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 
 from sindae.example_problems import FedBatchBioreactorProblem
 from sindae.plot_utils import plot_instance_data, plot_training_history
@@ -66,7 +66,11 @@ decomp_cfg = DecompConfig(
 # cyipopt options for subproblem solutions
 decomp_cyipopt = dict(tol=1e-6, max_iter=500, mu_init=1e-4)
 
-# Ipopt options for simultaneous training
+simul_cfg = SimultaneousConfig(
+    use_gbm  = USE_GBM,
+    reg_coef = REG_COEF,
+)
+# POUNCE options for simultaneous training
 simul_pounce = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
 
 _STATE_NAMES  = ['$X$', '$P$', '$S$', '$V$']
@@ -111,20 +115,18 @@ mlp = pretrain_mlp(mlp, smoother_data, PretrainConfig(epochs=200, batch_size=32,
 
 if METHOD == 'decomp':
     logger.info('=== 4. Training (decomposition) ===')
-    mlp, history = train_decomp(
+    trained_m, mlp, history = train_decomp(
         problem=problem, mlp=mlp, cfg=decomp_cfg,
         data=smoother_data, smoother_model=smoother_m,
         cyipopt_options=decomp_cyipopt,
     )
-    trained_m = smoother_m
 
 elif METHOD == 'simul':
     logger.info('=== 4. Solving simultaneously ===')
-    trained_m, mlp = solve_simultaneous(
-        problem=problem, mlp=mlp,
+    trained_m, mlp, history = solve_simultaneous(
+        problem=problem, mlp=mlp, cfg=simul_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        use_gbm=USE_GBM, reg_coef=REG_COEF,
-        pounceoptions=simul_pounce, tee=True,
+        pounce_options=simul_pounce, tee=True,
     )
 
 else:
@@ -155,8 +157,7 @@ if PLOTTING:
     fig_x.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_states.pdf'))
     fig_z.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_output.pdf'))
 
-    if METHOD == 'decomp':
-        fig_h, _ = plot_training_history(history)
-        fig_h.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_history.pdf'))
+    fig_h, _ = plot_training_history(history)
+    fig_h.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_history.pdf'))
 
     logger.info('Plots saved to %s', plot_folder)

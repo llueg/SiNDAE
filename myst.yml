@@ -39,6 +39,7 @@ project:
       children:
         - file: docs/examples_gallery/index.md
         - file: docs/examples_gallery/four_tank_example.ipynb
+        - file: docs/examples_gallery/leslie_gower_example.ipynb
     - file: docs/bibliography.md
 
 site:

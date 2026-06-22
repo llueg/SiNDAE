@@ -1,13 +1,13 @@
 """
 train.py  (simultaneous approach)
 
-solve_simultaneous — build and solve the simultaneous NLP with IPOPT.
+solve_simultaneous — build and solve the simultaneous NLP in a single solver call.
 
 The simultaneous approach places NN weights/biases directly inside the NLP
-as decision variables.  IPOPT optimises states, NN outputs, and NN parameters
-jointly in a single solve — no outer training loop required.
+as decision variables.  The solver optimises states, NN outputs, and NN
+parameters jointly in a single solve — no outer training loop required.
 
-Two sub-approaches are supported (controlled by ``use_gbm``):
+Two sub-approaches are supported (controlled by ``SimultaneousConfig.use_gbm``):
   False (default) : expression-writing — NNBlock, exact Hessian available
                     → solved with ``SolverFactory('pounce')`` (ASL interface)
   True            : grey-box (NNSimulGreyBoxModel) — requires L-BFGS
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import pyomo.environ as pyo
@@ -37,51 +38,68 @@ from sindae.algorithms.simultaneous.model_builder import (
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class SimultaneousConfig:
+    """Hyperparameters for the simultaneous (single-NLP) training approach."""
+    use_gbm:  bool  = False   # grey-box (L-BFGS) vs expression-writing (exact Hessian)
+    reg_coef: float = 0.0     # L2 regularization coefficient on NN parameters
+
+
 def solve_simultaneous(
     problem: ProblemDefinition,
     mlp: SimpleMLP,
+    cfg: SimultaneousConfig,
     data: InstanceData,
-    traj_indices: Optional[List[int]] = None,
     smoother_model: Optional[pyo.ConcreteModel] = None,
-    use_gbm: bool = False,
-    reg_coef: float = 0.0,
-    pounceoptions: Optional[dict] = None,
+    pounce_options: Optional[dict] = None,
+    traj_indices: Optional[List[int]] = None,
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
-) -> Tuple[pyo.ConcreteModel, SimpleMLP]:
+) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
     """
-    Build and solve the simultaneous NLP, returning the solved model and
-    the trained SimpleMLP.
+    Build and solve the simultaneous NLP, returning the solved model, the
+    trained SimpleMLP, and the per-iteration solver history.
 
     Parameters
     ----------
     problem        : ProblemDefinition
     mlp            : SimpleMLP          (architecture + initial weights)
+    cfg            : SimultaneousConfig
+        Algorithm hyperparameters (``use_gbm``, ``reg_coef``).
     data           : InstanceData
         Provides normalization statistics (input_mean/std, output_mean/std).
-    traj_indices   : List[int], optional  (default: all trajectories)
     smoother_model : pyo.ConcreteModel, optional
         Solved smoother model to reuse (warm-starts the simultaneous solve
         and avoids rebuilding / re-discretising the model).
-    use_gbm        : bool
-        False (default): expression-writing, exact Hessian available.
-        True:            grey-box (NNSimulGreyBoxModel), requires L-BFGS.
-    reg_coef       : float
-        L2 regularisation coefficient on NN parameters.
-    pounceoptions  : dict, optional
-        Extra IPOPT options, e.g. ``{'max_iter': 500, 'tol': 1e-6,
-        'hessian_approximation': 'limited-memory'}``.
+    pounce_options : dict, optional
+        Extra solver options, e.g. ``{'max_iter': 500, 'tol': 1e-6,
+        'hessian_approximation': 'limited-memory'}``.  Passed to POUNCE
+        (expression-writing) or cyipopt (GBM) depending on ``cfg.use_gbm``.
+    traj_indices   : List[int], optional  (default: all trajectories)
+    tee            : bool
+        Stream solver output to stdout.
+    timer          : HierarchicalTimer, optional
+        Reuse an external timer; a fresh one is created when omitted.
+    unfix_io       : bool
+        Unfix the NN input/output variables before solving (default True).
 
     Returns
     -------
-    m           : pyo.ConcreteModel  (solved; pass to ``problem.extract_arrays``)
+    m           : pyo.ConcreteModel  (solved; pass to ``extract_instance_data``)
     trained_mlp : SimpleMLP          (optimised weights extracted from the NLP)
+    history     : dict
+        Per-iteration solver history with keys ``obj_history`` (objective value)
+        and ``grad_norm_history`` (scaled dual infeasibility), plus ``n_iter``.
+        Plot with ``plot_training_history``.
     """
     if timer is None:
         timer = HierarchicalTimer()
     if traj_indices is None:
         traj_indices = list(range(problem.num_trajectories))
+
+    use_gbm  = cfg.use_gbm
+    reg_coef = cfg.reg_coef
 
     # ── Build model ────────────────────────────────────────────────────────────
     timer.start('build')
@@ -111,17 +129,17 @@ def solve_simultaneous(
         timer.stop('build')
 
     # ── Helpers: configure and call solver ────────────────────────────────────
-    def _solve_ipopt(extra_opts):
+    def _solve_pounce(extra_opts):
         """ASL-based POUNCE: expression-writing path (no ExternalGreyBoxBlock)."""
-        ipopt = pyo.SolverFactory('pounce')
-        if pounceoptions:
-            for k, v in pounceoptions.items():
-                ipopt.options[k] = v
+        solver = pyo.SolverFactory('pounce')
+        if pounce_options:
+            for k, v in pounce_options.items():
+                solver.options[k] = v
         for k, v in extra_opts.items():
-            ipopt.options[k] = v
+            solver.options[k] = v
         _log = tmp_log_path()
-        set_output_file(ipopt, _log)
-        result = ipopt.solve(m, tee=tee)
+        set_output_file(solver, _log)
+        result = solver.solve(m, tee=tee)
         timing = parse_pounce_log(_log)
         os.unlink(_log)
         logger.info(
@@ -132,8 +150,8 @@ def solve_simultaneous(
     def _solve_cyipopt(extra_opts):
         """cyipopt: GBM path (required for ExternalGreyBoxBlock)."""
         solver = pyo.SolverFactory('cyipopt')
-        if pounceoptions:
-            for k, v in pounceoptions.items():
+        if pounce_options:
+            for k, v in pounce_options.items():
                 solver.config.options[k] = v
         for k, v in extra_opts.items():
             solver.config.options[k] = v
@@ -152,18 +170,24 @@ def solve_simultaneous(
     try:
         if use_gbm:
             logger.info("=== Solving simultaneous GBM model (cyipopt, L-BFGS) ===")
-            result, pouncetiming = _solve_cyipopt({'hessian_approximation': 'limited-memory'})
+            result, pounce_timing = _solve_cyipopt({'hessian_approximation': 'limited-memory'})
         else:
             logger.info("=== Solving simultaneous model (POUNCE, expr-writing) ===")
-            result, pouncetiming = _solve_ipopt({})
+            result, pounce_timing = _solve_pounce({})
     finally:
         timer.stop('solve')
 
     m._solver_result = result
-    m._pouncetiming  = pouncetiming
+    m._pounce_timing = pounce_timing
+
+    history = {
+        'obj_history':       pounce_timing['obj_history'],
+        'grad_norm_history': pounce_timing['grad_norm_history'],
+        'n_iter':            pounce_timing['n_iter'],
+    }
 
     # ── Extract trained MLP ────────────────────────────────────────────────────
     trained_mlp = extract_mlp(m)
     logger.info("=== Simultaneous solve complete ===")
 
-    return m, trained_mlp
+    return m, trained_mlp, history

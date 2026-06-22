@@ -247,7 +247,7 @@ def solve_inference(
     timer.stop('solve')
 
     m._solver_result = result
-    m._pouncetiming  = parse_pounce_log(_log)
+    m._pounce_timing = parse_pounce_log(_log)
     os.unlink(_log)
     logger.info(
         f"  Inference: {result.solver.status} / {result.solver.termination_condition}"

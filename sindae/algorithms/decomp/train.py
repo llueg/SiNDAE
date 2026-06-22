@@ -114,7 +114,7 @@ def train_decomp(
     smoother_model: Optional[pyo.ConcreteModel] = None,
     mpi_comm=None,
     cyipopt_options: Optional[dict] = None,
-) -> Tuple[SimpleMLP, dict]:
+) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
     """
     Train a neural network via the decomposition (GBM + KKT gradient) approach.
 
@@ -138,8 +138,16 @@ def train_decomp(
 
     Returns
     -------
-    mlp     : SimpleMLP  (trained; rank-0 parameters are authoritative)
-    history : dict with keys obj_history, grad_norm_history, diag_history
+    trained_m : pyo.ConcreteModel
+        The solved decomposition NLP (the rank-local model under MPI).  Holds
+        the final training iterate's trajectory; pass to
+        ``extract_instance_data`` to recover states/outputs.  The trajectory
+        reflects the last solve, which may differ slightly from the returned
+        best-weights ``mlp``; for a trajectory strictly consistent with ``mlp``
+        use ``solve_inference``.
+    mlp       : SimpleMLP  (trained; rank-0 parameters are authoritative)
+    history   : dict with keys obj_history, data_fit_history,
+        grad_norm_history, diag_history, pouncetiming_history
     """
     jax.config.update("jax_enable_x64", True)
 
@@ -343,7 +351,7 @@ def train_decomp(
         logger.info("=== Training complete ===")
         logger.info(str(timer))
 
-    return unflatten_fn(best_params), {
+    return m, unflatten_fn(best_params), {
         'obj_history':          obj_history,
         'data_fit_history':     data_fit_history,
         'grad_norm_history':    grad_norm_history,

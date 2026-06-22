@@ -6,6 +6,13 @@ The simultaneous approach embeds NN parameters as decision variables in a single
 large NLP and solves it with POUNCE (expression-writing, exact Hessian) or
 cyipopt (GBM / L-BFGS).
 
+## Configuration
+
+```{autoclass} sindae.algorithms.simultaneous.train.SimultaneousConfig
+:members:
+:undoc-members:
+```
+
 ## Model Builders
 
 ```{autofunction} sindae.algorithms.simultaneous.model_builder.build_simultaneous_model

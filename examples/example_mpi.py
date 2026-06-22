@@ -165,7 +165,7 @@ if is_root:
     logger.info('=== 4. Training decomposition (%d ranks) ===', size)
 
 comm.Barrier()
-mlp, history = train_decomp(
+trained_m, mlp, history = train_decomp(
     problem=problem,
     mlp=mlp,
     cfg=decomp_cfg,

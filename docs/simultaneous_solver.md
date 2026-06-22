@@ -48,24 +48,36 @@ Solver: `SolverFactory('cyipopt')`.
 ## Usage
 
 ```python
-from sindae.algorithms.simultaneous.train import solve_simultaneous
+from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 
-trained_m, mlp = solve_simultaneous(
+cfg = SimultaneousConfig(
+    use_gbm=False,    # expression-writing (exact Hessian)
+    reg_coef=1e-3,    # L2 regularization on NN weights
+)
+trained_m, mlp, history = solve_simultaneous(
     problem=problem,
     mlp=mlp,
+    cfg=cfg,
     data=smoother_data,           # provides normalization stats
     smoother_model=smoother_m,    # warm-start (optional but recommended)
-    use_gbm=False,                # expression-writing (exact Hessian)
-    reg_coef=1e-3,                # L2 regularization on NN weights
-    pounceoptions={
+    pounce_options={
         'tol': 1e-6,
         'max_iter': 1000,
     },
 )
 ```
 
-After the solve, `mlp` holds the trained network weights (extracted from the NLP solution).
+The two training entry points share the same call and return layout:
+
+```python
+trained_m, mlp, history = solve_simultaneous(problem, mlp, cfg, data, smoother_model=..., pounce_options=...)   # SimultaneousConfig
+trained_m, mlp, history = train_decomp(problem, mlp, cfg, data, smoother_model=..., cyipopt_options=...)         # DecompConfig
+```
+
+`mlp` holds the trained network weights (extracted from the NLP solution).
 `trained_m` is the solved Pyomo model; pass it to `extract_instance_data` for trajectories.
+`history` has `obj_history` (objective per IPOPT iteration) and `grad_norm_history`
+(scaled dual infeasibility per iteration); plot with `plot_training_history`.
 
 ---
 

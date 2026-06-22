@@ -92,15 +92,16 @@ smoother_data = extract_instance_data(problem, smoother_m)
 ## 5a. Train (simultaneous approach)
 
 ```python
-from sindae.algorithms.simultaneous.train import solve_simultaneous
+from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 
-trained_m, mlp = solve_simultaneous(
+cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)
+trained_m, mlp, history = solve_simultaneous(
     problem=problem,
     mlp=mlp,
+    cfg=cfg,
     data=smoother_data,
     smoother_model=smoother_m,  # warm-start from smoother
-    reg_coef=1e-3,
-    pounceoptions={'tol': 1e-6, 'max_iter': 1000},
+    pounce_options={'tol': 1e-6, 'max_iter': 1000},
 )
 ```
 
@@ -119,11 +120,20 @@ mlp = pretrain_mlp(mlp, smoother_data, PretrainConfig(epochs=400))
 
 cfg = DecompConfig(n_steps=300, lr=5e-3, init_slack_coef=10.0,
                    param_reg_coef=1e-3)
-mlp, history = train_decomp(
+trained_m, mlp, history = train_decomp(
     problem=problem, mlp=mlp, cfg=cfg,
     data=smoother_data, smoother_model=smoother_m,
 )
 ```
+
+Recover the trained trajectory the same way for either approach:
+
+```python
+trained_data = extract_instance_data(problem, trained_m)
+```
+
+`history` holds `obj_history` and `grad_norm_history`; plot with
+`plot_training_history(history)`.
 
 See {doc}`decomposition_solver` for a detailed explanation.
 

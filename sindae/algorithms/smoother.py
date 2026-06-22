@@ -14,7 +14,7 @@ API
   build_smoother_model(problem, mlp, traj_indices, smooth_coef=1.0) -> ConcreteModel
 
   solve_smoother(problem, mlp, traj_indices=None, smooth_coef=1.0,
-                 pounceoptions=None) -> ConcreteModel
+                 pounce_options=None) -> ConcreteModel
 """
 from __future__ import annotations
 
@@ -144,7 +144,7 @@ def solve_smoother(
     mlp: SimpleMLP,
     traj_indices: Optional[List[int]] = None,
     smooth_coef: float = 1.0,
-    pounceoptions: Optional[dict] = None,
+    pounce_options: Optional[dict] = None,
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
 ) -> pyo.ConcreteModel:
@@ -153,11 +153,11 @@ def solve_smoother(
 
     Parameters
     ----------
-    problem       : ProblemDefinition  (obs_times and obs_values must be set)
-    mlp           : SimpleMLP          (used for out_size only)
-    traj_indices  : List[int], optional  (default: all trajectories)
-    smooth_coef   : float
-    pounceoptions : dict, optional  (e.g. ``{'tol': 1e-6, 'max_iter': 500}``)
+    problem        : ProblemDefinition  (obs_times and obs_values must be set)
+    mlp            : SimpleMLP          (used for out_size only)
+    traj_indices   : List[int], optional  (default: all trajectories)
+    smooth_coef    : float
+    pounce_options : dict, optional  (e.g. ``{'tol': 1e-6, 'max_iter': 500}``)
 
     Returns
     -------
@@ -181,19 +181,19 @@ def solve_smoother(
                              )
     timer.stop('build')
 
-    ipopt = pyo.SolverFactory('pounce')
-    if pounceoptions:
-        for k, v in pounceoptions.items():
-            ipopt.options[k] = v
+    solver = pyo.SolverFactory('pounce')
+    if pounce_options:
+        for k, v in pounce_options.items():
+            solver.options[k] = v
     _log = tmp_log_path()
-    set_output_file(ipopt, _log)
+    set_output_file(solver, _log)
 
     timer.start('solve')
-    result = ipopt.solve(m, tee=False)
+    result = solver.solve(m, tee=False)
     timer.stop('solve')
 
     m._solver_result = result
-    m._pouncetiming  = parse_pounce_log(_log)
+    m._pounce_timing = parse_pounce_log(_log)
     os.unlink(_log)
     logger.info(
         f"  Smoother: {result.solver.status} / {result.solver.termination_condition}"

@@ -54,7 +54,7 @@ cfg = DecompConfig(
     patience=20,                 # early stopping (set 0 to disable)
 )
 
-mlp, history = train_decomp(
+trained_m, mlp, history = train_decomp(
     problem=problem,
     mlp=mlp,
     cfg=cfg,
@@ -62,10 +62,13 @@ mlp, history = train_decomp(
     smoother_model=smoother_m,    # warm-start the inner NLP
     cyipopt_options={'tol': 1e-6, 'max_iter': 300},
 )
+
+# trained_m is the solved NLP; recover trajectories with:
+trained_data = extract_instance_data(problem, trained_m)
 ```
 
 `history` is a dict with keys:
-`obj_history`, `data_fit_history`, `grad_norm_history`, `diag_history`, `ipopt_timing_history`.
+`obj_history`, `data_fit_history`, `grad_norm_history`, `diag_history`, `pouncetiming_history`.
 
 ---
 
@@ -98,8 +101,11 @@ step:
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
-mlp, history = train_decomp(problem, mlp, cfg, data, mpi_comm=comm)
+trained_m, mlp, history = train_decomp(problem, mlp, cfg, data, mpi_comm=comm)
 ```
+
+Under MPI, `trained_m` is the **rank-local** model (holding only that rank's
+trajectories); the returned `mlp` is identical across ranks (rank-0 authoritative).
 
 Run with: `mpirun -n 4 python train.py`
 

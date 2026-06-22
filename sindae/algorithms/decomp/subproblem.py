@@ -90,7 +90,7 @@ class TrajectoryBatchSubproblem:
         mu_target=1e-10,
         slack_coef=1.0,
         subsample_frac=1.0,
-        cypounceoptions=None,
+        cyipopt_options=None,
     ):
         self._model         = model
         self._gbm           = gbm

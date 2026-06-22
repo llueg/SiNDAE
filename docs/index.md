@@ -30,7 +30,7 @@ Lagrange–Radau collocation for time discretization.
 import jax
 from sindae import SimpleMLP, generate_data
 from sindae.algorithms.smoother import solve_smoother
-from sindae.algorithms.simultaneous.train import solve_simultaneous
+from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 from sindae.example_problems import LeslieGowerProblem
 
 problem = LeslieGowerProblem(nfe=40, ncp=3)
@@ -39,8 +39,9 @@ mlp = SimpleMLP(in_size=2, out_size=1, widths=[16, 16],
 
 data = generate_data(problem, noise_std=[0.05, 0.05])
 smoother_m = solve_smoother(problem, mlp)
-trained_m, mlp = solve_simultaneous(problem, mlp, data=data,
-                                    smoother_model=smoother_m)
+cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)
+trained_m, mlp, history = solve_simultaneous(problem, mlp, cfg, data=data,
+                                             smoother_model=smoother_m)
 ```
 
 See {doc}`quickstart` for the full walkthrough.

@@ -17,6 +17,7 @@ from sindae.algorithms.decomp.model_builder import build_decomp_model as build_d
 from sindae.algorithms.simultaneous.model_builder import build_simultaneous_model as build_simultaneous_model
 from sindae.algorithms.simultaneous.model_builder import build_simultaneous_model_gbm as build_simultaneous_model_gbm
 from sindae.algorithms.simultaneous.model_builder import extract_mlp as extract_mlp
+from sindae.algorithms.simultaneous.train import SimultaneousConfig as SimultaneousConfig
 from sindae.algorithms.simultaneous.train import solve_simultaneous as solve_simultaneous
 from sindae.algorithms.inference import make_inference_model as make_inference_model
 from sindae.algorithms.inference import solve_inference as solve_inference
