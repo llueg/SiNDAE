@@ -54,7 +54,7 @@ cfg = SimultaneousConfig(
     use_gbm=False,    # expression-writing (exact Hessian)
     reg_coef=1e-3,    # L2 regularization on NN weights
 )
-trained_m, mlp, history = solve_simultaneous(
+trained_m, mlp = solve_simultaneous(
     problem=problem,
     mlp=mlp,
     cfg=cfg,
@@ -67,17 +67,13 @@ trained_m, mlp, history = solve_simultaneous(
 )
 ```
 
-The two training entry points share the same call and return layout:
-
-```python
-trained_m, mlp, history = solve_simultaneous(problem, mlp, cfg, data, smoother_model=..., pounce_options=...)   # SimultaneousConfig
-trained_m, mlp, history = train_decomp(problem, mlp, cfg, data, smoother_model=..., cyipopt_options=...)         # DecompConfig
-```
-
 `mlp` holds the trained network weights (extracted from the NLP solution).
 `trained_m` is the solved Pyomo model; pass it to `extract_instance_data` for trajectories.
-`history` has `obj_history` (objective per IPOPT iteration) and `grad_norm_history`
-(scaled dual infeasibility per iteration); plot with `plot_training_history`.
+
+The simultaneous approach solves a single NLP, so there is no training-curve
+history to return (unlike {doc}`decomposition_solver`, whose outer Adam loop
+produces one). Solve progress is reported by the solver status and, with
+`tee=True`, the live IPOPT iteration log.
 
 ---
 

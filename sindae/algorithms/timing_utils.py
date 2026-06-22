@@ -33,28 +33,17 @@ import re
 import tempfile
 from typing import Optional
 
-# Matches the iteration index at the start of an IPOPT iteration row.  The
-# trailing letter marks restoration-phase / acceptance iterations (e.g. "12r").
-# Fields: iter  obj  inf_pr  inf_du  lg(mu)  ||d||  lg(rg)  alpha_du alpha_pr  ls
-_ITER_HEAD_RE = re.compile(r'^(\d+)[a-zA-Z]?$')
-
-
-def _parse_iter_row(line: str):
-    """Parse one IPOPT iteration row.
-
-    Returns ``(iter, objective, inf_du, lg_rg)`` or ``None`` if the line is not
-    an iteration row.  ``objective`` is the current objective value and
-    ``inf_du`` is the scaled dual infeasibility (the Lagrangian-gradient norm).
-    """
-    parts = line.split()
-    if len(parts) < 7 or not _ITER_HEAD_RE.match(parts[0]):
-        return None
-    try:
-        objective = float(parts[1])
-        inf_du    = float(parts[3])
-    except ValueError:
-        return None
-    return int(_ITER_HEAD_RE.match(parts[0]).group(1)), objective, inf_du, parts[6]
+# Matches one IPOPT iteration row.  The 7th field (index 6) is lg(rg).
+# Fields: iter  obj  inf_pr  inf_du  lg(mu)  ||d||  lg(rg)  ...
+_ITER_RE = re.compile(
+    r'^\s*(\d+)\s+'   # iter number
+    r'\S+\s+'         # objective
+    r'\S+\s+'         # inf_pr
+    r'\S+\s+'         # inf_du
+    r'\S+\s+'         # lg(mu)
+    r'\S+\s+'         # ||d||
+    r'(\S+)'          # lg(rg): '-' or a decimal like '-4.0'
+)
 
 
 def tmp_log_path() -> str:
@@ -71,19 +60,14 @@ def parse_pounce_log(path: str) -> dict:
     Returns
     -------
     dict with keys:
-      'pounceonly'        : float or None  — seconds in IPOPT excluding NLP evals
-      'nlp_evals'         : float or None  — seconds in NLP function evaluations
-      'n_iter'            : int or None    — number of IPOPT iterations
-      'last_lgrg'         : str or None    — lg(rg) at the final iteration
-      'obj_history'       : list[float]    — objective value per iteration
-      'grad_norm_history' : list[float]    — scaled dual infeasibility per iteration
+      'pounceonly' : float or None  — seconds in IPOPT excluding NLP evals
+      'nlp_evals'  : float or None  — seconds in NLP function evaluations
+      'n_iter'     : int or None    — number of IPOPT iterations
     """
     pounceonly: Optional[float] = None
     nlp_evals:  Optional[float] = None
     n_iter:     Optional[int]   = None
-    last_lgrg:  Optional[str]   = None
-    obj_history:       list = []
-    grad_norm_history: list = []
+    last_lgrg:  Optional[str]   = None   # lg(rg) value at the last iteration
 
     try:
         with open(path) as f:
@@ -106,21 +90,17 @@ def parse_pounce_log(path: str) -> dict:
                 if m:
                     n_iter = int(m.group(1))
 
-                row = _parse_iter_row(line)
-                if row is not None:
-                    _, objective, inf_du, last_lgrg = row
-                    obj_history.append(objective)
-                    grad_norm_history.append(inf_du)
+                m = _ITER_RE.match(line)
+                if m:
+                    last_lgrg = m.group(2)
     except OSError:
         pass
 
     return {
-        'pounceonly':        pounceonly,
-        'nlp_evals':         nlp_evals,
-        'n_iter':            n_iter,
-        'last_lgrg':         last_lgrg,
-        'obj_history':       obj_history,
-        'grad_norm_history': grad_norm_history,
+        'pounceonly': pounceonly,
+        'nlp_evals':  nlp_evals,
+        'n_iter':     n_iter,
+        'last_lgrg':  last_lgrg,
     }
 
 

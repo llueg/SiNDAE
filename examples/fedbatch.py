@@ -123,7 +123,7 @@ if METHOD == 'decomp':
 
 elif METHOD == 'simul':
     logger.info('=== 4. Solving simultaneously ===')
-    trained_m, mlp, history = solve_simultaneous(
+    trained_m, mlp = solve_simultaneous(
         problem=problem, mlp=mlp, cfg=simul_cfg,
         data=smoother_data, smoother_model=smoother_m,
         pounce_options=simul_pounce, tee=True,
@@ -157,7 +157,8 @@ if PLOTTING:
     fig_x.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_states.pdf'))
     fig_z.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_output.pdf'))
 
-    fig_h, _ = plot_training_history(history)
-    fig_h.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_history.pdf'))
+    if METHOD == 'decomp':
+        fig_h, _ = plot_training_history(history)
+        fig_h.savefig(os.path.join(plot_folder, f'fedbatch_{METHOD}_history.pdf'))
 
     logger.info('Plots saved to %s', plot_folder)

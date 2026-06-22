@@ -95,7 +95,7 @@ smoother_data = extract_instance_data(problem, smoother_m)
 from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 
 cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)
-trained_m, mlp, history = solve_simultaneous(
+trained_m, mlp = solve_simultaneous(
     problem=problem,
     mlp=mlp,
     cfg=cfg,
@@ -132,8 +132,8 @@ Recover the trained trajectory the same way for either approach:
 trained_data = extract_instance_data(problem, trained_m)
 ```
 
-`history` holds `obj_history` and `grad_norm_history`; plot with
-`plot_training_history(history)`.
+For the decomposition run, `history` holds the training curve
+(`obj_history`, `grad_norm_history`); plot it with `plot_training_history(history)`.
 
 See {doc}`decomposition_solver` for a detailed explanation.
 

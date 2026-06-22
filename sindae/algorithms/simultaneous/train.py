@@ -56,10 +56,10 @@ def solve_simultaneous(
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
-) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
+) -> Tuple[pyo.ConcreteModel, SimpleMLP]:
     """
-    Build and solve the simultaneous NLP, returning the solved model, the
-    trained SimpleMLP, and the per-iteration solver history.
+    Build and solve the simultaneous NLP, returning the solved model and
+    the trained SimpleMLP.
 
     Parameters
     ----------
@@ -88,10 +88,6 @@ def solve_simultaneous(
     -------
     m           : pyo.ConcreteModel  (solved; pass to ``extract_instance_data``)
     trained_mlp : SimpleMLP          (optimised weights extracted from the NLP)
-    history     : dict
-        Per-iteration solver history with keys ``obj_history`` (objective value)
-        and ``grad_norm_history`` (scaled dual infeasibility), plus ``n_iter``.
-        Plot with ``plot_training_history``.
     """
     if timer is None:
         timer = HierarchicalTimer()
@@ -180,14 +176,8 @@ def solve_simultaneous(
     m._solver_result = result
     m._pounce_timing = pounce_timing
 
-    history = {
-        'obj_history':       pounce_timing['obj_history'],
-        'grad_norm_history': pounce_timing['grad_norm_history'],
-        'n_iter':            pounce_timing['n_iter'],
-    }
-
     # ── Extract trained MLP ────────────────────────────────────────────────────
     trained_mlp = extract_mlp(m)
     logger.info("=== Simultaneous solve complete ===")
 
-    return m, trained_mlp, history
+    return m, trained_mlp

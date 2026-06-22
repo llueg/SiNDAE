@@ -40,8 +40,8 @@ mlp = SimpleMLP(in_size=2, out_size=1, widths=[16, 16],
 data = generate_data(problem, noise_std=[0.05, 0.05])
 smoother_m = solve_smoother(problem, mlp)
 cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)
-trained_m, mlp, history = solve_simultaneous(problem, mlp, cfg, data=data,
-                                             smoother_model=smoother_m)
+trained_m, mlp = solve_simultaneous(problem, mlp, cfg, data=data,
+                                    smoother_model=smoother_m)
 ```
 
 See {doc}`quickstart` for the full walkthrough.
