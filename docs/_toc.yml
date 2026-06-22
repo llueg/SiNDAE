@@ -23,4 +23,6 @@ chapters:
     chapters:
       - file: examples_gallery/index
       - file: examples_gallery/four_tank_example
+      - file: examples_gallery/leslie_gower_example
+      - file: examples_gallery/fedbatch_example
   - file: bibliography

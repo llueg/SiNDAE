@@ -1,54 +1,50 @@
 # Examples Gallery
 
-The examples below demonstrate SiNDAE on benchmark hybrid DAE systems.
-Each example covers data generation, smoother initialisation, and training with
-both the simultaneous and decomposition approaches.
+Each notebook below walks through a complete workflow on a benchmark system, but
+they are organised around **package capabilities** rather than the models
+themselves. Pick the one that matches what you want to do.
 
 ---
 
-## Available Examples
+## Notebooks
 
-### Leslie-Gower Predator-Prey
+### [Four-Tank Hydraulic Network](four_tank_example.ipynb)
 
-A two-state ODE. The NN replaces a modified Holling type II predator growth term.
-Demonstrates the simplest SiNDAE workflow on a pure ODE.
+A four-state, **index-2 DAE** with five algebraic flow variables. The NN replaces
+two nonlinear hydraulic relations. Demonstrates the end-to-end **simultaneous**
+workflow: defining a DAE `ProblemDefinition`, data generation, smoother,
+pre-training, training, and inference on new initial conditions.
 
-**Script:** `examples/leslie_gower.py`
+### [Leslie-Gower Predator-Prey](leslie_gower_example.ipynb)
 
----
+A two-state ODE trained with the **decomposition** approach. Demonstrates adding a
+**custom path constraint** (a Lyapunov descent inequality) to embed mechanistic
+prior knowledge during training.
 
-### Four-Tank Hydraulic Network
+### [Fed-Batch Bioreactor: Importing Measured Data](fedbatch_example.ipynb)
 
-A four-state, index-2 DAE with five algebraic flow variables. The NN replaces two
-nonlinear hydraulic functions (pump characteristic and tank discharge).
-
-**Script:** `examples/four_tank.py`
-
----
-
-### Fed-Batch Bioreactor
-
-A four-state ODE with Monod growth kinetics. The NN replaces the specific growth rate
-$\mu(S)$.
-
-**Script:** `examples/fedbatch.py`
+A four-state ODE with Monod growth kinetics. Demonstrates the **bring-your-own-data**
+workflow: loading measured time series from a CSV into `obs_times` / `obs_values`
+(no synthetic data generation), and verifying that the trained model produces
+**physically feasible predictions** under new operating conditions via inference.
 
 ---
 
-### Multi-Trajectory MPI (Four-Tank)
+## Command-line scripts
 
-The four-tank system trained over three independent initial conditions in parallel using
-MPI. Demonstrates the `mpi_comm` argument to `train_decomp`.
+The same systems are available as runnable scripts in the `examples/` directory,
+including a multi-trajectory **MPI** example:
 
-**Script:** `examples/example_mpi.py`
-
----
-
-## Running an Example
+| Script | Demonstrates |
+|--------|--------------|
+| `examples/four_tank.py` | Four-tank DAE, `simul` / `decomp` toggle |
+| `examples/leslie_gower.py` | Leslie-Gower ODE with Lyapunov constraint |
+| `examples/fedbatch.py` | Fed-batch bioreactor |
+| `examples/example_mpi.py` | Four-tank trained over MPI ranks |
 
 ```bash
-# Single-process
-python examples/leslie_gower.py
+# Single process
+python examples/four_tank.py
 
 # MPI (decomposition, 4 ranks)
 mpirun -n 4 python examples/example_mpi.py
@@ -56,9 +52,3 @@ mpirun -n 4 python examples/example_mpi.py
 
 Set `METHOD = 'simul'` or `METHOD = 'decomp'` at the top of each script to switch
 between the two training algorithms.
-
----
-
-```{note}
-Jupyter notebook versions of these examples are coming soon.
-```
