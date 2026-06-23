@@ -173,10 +173,10 @@ def generate_data(
 
     Builds a Pyomo model using problem.build_trajectory +
     problem.add_true_output_constraints + problem.discretize, solves with
-    IPOPT, then:
+    POUNCE, then:
       - Sets problem.obs_times  (subsampled collocation times)
       - Sets problem.obs_values (noisy observations of get_obs_vars)
-      - Returns (x_true, z_true) at all collocation points
+      - Returns the true trajectories as an InstanceData
 
     Parameters
     ----------
@@ -196,8 +196,10 @@ def generate_data(
 
     Returns
     -------
-    x_true : List[np.ndarray]  shape (n_pts, input_dim)  per trajectory
-    z_true : List[np.ndarray]  shape (n_pts, output_dim) per trajectory
+    InstanceData
+        True trajectories at all collocation points (nn_input, nn_output, obs,
+        and aux_vars per trajectory). Returns ``None`` if the POUNCE solve fails
+        or does not reach optimality.
     """
     rng = np.random.default_rng(seed)
     obs_dim = problem.obs_dim

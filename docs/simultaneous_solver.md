@@ -71,7 +71,7 @@ trained_m, mlp = solve_simultaneous(
 `trained_m` is the solved Pyomo model; pass it to `extract_instance_data` for trajectories.
 
 The simultaneous approach solves a single NLP, so there is no training-curve
-history to return (unlike {doc}`decomposition_solver`, whose outer Adam loop
+history to return (unlike [](decomposition_solver.md), whose outer Adam loop
 produces one). Solve progress is reported by the solver status and, with
 `tee=True`, the live IPOPT iteration log.
 
@@ -106,11 +106,11 @@ For the GBM path, also set `hessian_approximation: limited-memory` (required).
 - When you want the simplest possible workflow (one function call, no outer loop).
 
 For large networks, many trajectories, or MPI-parallel training, consider the
-{doc}`decomposition_solver`.
+[](decomposition_solver.md).
 
 ---
 
 ## API Reference
 
-See {doc}`api/simultaneous` for `solve_simultaneous`, `build_simultaneous_model`,
+See [](api/simultaneous.md) for `solve_simultaneous`, `build_simultaneous_model`,
 `build_simultaneous_model_gbm`, and `extract_mlp`.

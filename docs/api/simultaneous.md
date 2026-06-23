@@ -2,37 +2,51 @@
 
 `sindae.algorithms.simultaneous`
 
-The simultaneous approach embeds NN parameters as decision variables in a single
-large NLP and solves it with POUNCE (expression-writing, exact Hessian) or
-cyipopt (GBM / L-BFGS).
+The simultaneous approach embeds the NN weights and biases directly in a single large NLP
+and optimizes states, NN outputs, and NN parameters **jointly** in one solver call — no
+outer training loop. Two backends are available, selected by
+[`SimultaneousConfig.use_gbm`](#sindae.algorithms.simultaneous.train.SimultaneousConfig):
 
-## Configuration
+| `use_gbm` | Backend | Solver | Hessian |
+|-----------|---------|--------|---------|
+| `False` (default) | expression-writing | POUNCE | exact |
+| `True` | grey-box (GBM) | cyipopt | L-BFGS (limited-memory) |
 
-```{autoclass} sindae.algorithms.simultaneous.train.SimultaneousConfig
-:members:
-:undoc-members:
-```
+The expression-writing backend rewrites the `SimpleMLP` as explicit Pyomo expressions and
+gets an exact Hessian; the grey-box backend treats the network as a black box (function +
+Jacobian) and works with any smooth Equinox module. See
+[Defining a Network Architecture](network_architecture.md) for the trade-offs.
 
-## Model Builders
-
-```{autofunction} sindae.algorithms.simultaneous.model_builder.build_simultaneous_model
-```
-
-```{autofunction} sindae.algorithms.simultaneous.model_builder.build_simultaneous_model_gbm
-```
-
-```{autofunction} sindae.algorithms.simultaneous.model_builder.extract_mlp
-```
-
-## Training
-
-```{autofunction} sindae.algorithms.simultaneous.train.solve_simultaneous
-```
-
----
-
-## Usage Example
+## Usage
 
 ```python
-# [Add your usage example here]
+from sindae import extract_instance_data
+from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
+
+cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)   # expression-writing, exact Hessian
+
+trained_m, mlp = solve_simultaneous(
+    problem, mlp, cfg,
+    data=smoother_data,              # normalization statistics
+    smoother_model=smoother_m,       # reuse the discretized smoother as a warm start
+    pounce_options={'tol': 1e-6, 'max_iter': 1000},
+)
+trained_data = extract_instance_data(problem, trained_m)
 ```
+
+For problems whose exact Hessian is awkward (e.g. ratio terms like $P/X$), switch to the
+grey-box variant with a limited-memory Hessian:
+
+```python
+cfg = SimultaneousConfig(use_gbm=True, reg_coef=1e-3)
+trained_m, mlp = solve_simultaneous(
+    problem, mlp, cfg, data=smoother_data, smoother_model=smoother_m,
+    pounce_options={'tol': 1e-6, 'max_iter': 1000,
+                    'hessian_approximation': 'limited-memory'},
+)
+```
+
+## API reference
+
+:::{include} _generated/simultaneous.md
+:::

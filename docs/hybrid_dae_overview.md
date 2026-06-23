@@ -93,7 +93,7 @@ Optionally override:
 | `discretize` | Radau collocation | Override for custom schemes |
 | `add_true_output_constraints` | `NotImplementedError` | True formula for `generate_data` |
 
-See {doc}`api/problem` for the full API.
+See [](api/problem.md) for the full API.
 
 ---
 
@@ -108,7 +108,7 @@ Before training the NN, SiNDAE solves a **smoother NLP** that:
 The smoother penalises $\|\dot{z}_\text{smooth}\|^2$ weighted by `smooth_coef`.
 A larger `smooth_coef` produces smoother but potentially less data-faithful $z$ estimates.
 
-See {doc}`api/smoother` and `sindae.algorithms.smoother.solve_smoother`.
+See [](api/smoother.md) and `sindae.algorithms.smoother.solve_smoother`.
 
 ---
 

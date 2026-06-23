@@ -44,7 +44,7 @@ trained_m, mlp = solve_simultaneous(problem, mlp, cfg, data=data,
                                     smoother_model=smoother_m)
 ```
 
-See {doc}`quickstart` for the full walkthrough.
+See [](quickstart.md) for the full walkthrough.
 
 ---
 

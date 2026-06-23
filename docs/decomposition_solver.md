@@ -117,12 +117,12 @@ Run with: `mpirun -n 4 python train.py`
 - Many independent training trajectories (MPI parallelism).
 - When you want fine-grained control over the training schedule.
 
-For small-to-medium networks with few trajectories, the {doc}`simultaneous_solver` is
+For small-to-medium networks with few trajectories, the [](simultaneous_solver.md) is
 simpler and often faster.
 
 ---
 
 ## API Reference
 
-See {doc}`api/decomp` for `DecompConfig`, `train_decomp`, and `build_decomp_model`.
-See {doc}`api/pretrain` for `PretrainConfig` and `pretrain_mlp`.
+See [](api/decomp.md) for `DecompConfig`, `train_decomp`, and `build_decomp_model`.
+See [](api/pretrain.md) for `PretrainConfig` and `pretrain_mlp`.

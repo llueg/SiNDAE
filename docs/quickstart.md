@@ -6,7 +6,7 @@ custom problems.
 
 ## Prerequisites
 
-Follow the {doc}`installation` guide first. After installation, set JAX to 64-bit precision
+Follow the [](installation.md) guide first. After installation, set JAX to 64-bit precision
 at the top of your script:
 
 ```python
@@ -27,7 +27,7 @@ from sindae.example_problems import LeslieGowerProblem
 problem = LeslieGowerProblem(nfe=60, ncp=3)  # fine grid for data generation
 ```
 
-See {doc}`hybrid_dae_overview` for an explanation of `nfe`/`ncp` and how to subclass
+See [](hybrid_dae_overview.md) for an explanation of `nfe`/`ncp` and how to subclass
 `ProblemDefinition` for your own system.
 
 ---
@@ -105,7 +105,7 @@ trained_m, mlp = solve_simultaneous(
 )
 ```
 
-See {doc}`simultaneous_solver` for a detailed explanation.
+See [](simultaneous_solver.md) for a detailed explanation.
 
 ---
 
@@ -135,7 +135,7 @@ trained_data = extract_instance_data(problem, trained_m)
 For the decomposition run, `history` holds the training curve
 (`obj_history`, `grad_norm_history`); plot it with `plot_training_history(history)`.
 
-See {doc}`decomposition_solver` for a detailed explanation.
+See [](decomposition_solver.md) for a detailed explanation.
 
 ---
 
@@ -162,6 +162,6 @@ fig.savefig('result.pdf')
 
 ## Next steps
 
-- {doc}`hybrid_dae_overview` — mathematical background and problem formulation
-- {doc}`api/index` — full API reference
-- {doc}`examples_gallery/index` — complete worked examples
+- [](hybrid_dae_overview.md) — mathematical background and problem formulation
+- [](api/index.md) — full API reference
+- [](examples_gallery/index.md) — complete worked examples
