@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- **Python ≥ 3.9** (3.11 recommended)
+- **Python ≥ 3.11**
 - **conda** (recommended) or **pip** in a virtual environment
 - macOS, Linux, or Windows (WSL2 recommended on Windows)
 

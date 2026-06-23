@@ -30,6 +30,7 @@ project:
         - file: docs/api/problem.md
         - file: docs/api/data_utils.md
         - file: docs/api/nn_utils.md
+        - file: docs/api/network_architecture.md
         - file: docs/api/pretrain.md
         - file: docs/api/smoother.md
         - file: docs/api/simultaneous.md
