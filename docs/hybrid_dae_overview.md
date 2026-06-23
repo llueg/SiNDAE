@@ -44,7 +44,7 @@ finite elements with $N_{cp}$ collocation points each. This replaces the ODE/DAE
 with a finite set of algebraic equations, turning the training problem into a finite-dimensional NLP.
 
 ```{note}
-`nfe` and `ncp` control the accuracy–cost trade-off. Typical values: `nfe=40, ncp=3`.
+`nfe` and `ncp` control the accuracy–cost trade-off.`
 ```
 
 Pyomo's [`dae.collocation`](https://pyomo.readthedocs.io/) transformation handles the

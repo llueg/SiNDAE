@@ -7,6 +7,7 @@ name = "sindae"
 version = "0.0.1"
 description = "A package to learn unknown nonlinear terms in ODE/DAE systems via ML models and implicit differentiation"
 requires-python = ">=3.9"
+readme = "README.md"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 authors = [
@@ -49,4 +50,6 @@ full = [
 include = ["sindae*"]
 
 [project.urls]
-Homepage = ""
+Homepage = "https://github.com/llueg/SiNDAE"
+Documentation = "https://<you>.github.io/SiNDAE"
+Issues = "https://github.com/llueg/SiNDAE/issues"
