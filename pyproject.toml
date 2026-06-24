@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "sindae"
 version = "0.0.1"
 description = "A package to learn unknown nonlinear terms in ODE/DAE systems via ML models and implicit differentiation"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
@@ -45,11 +45,20 @@ full = [
     "cyipopt>=1.4",
     "mpi4py>=3.1",
 ]
+test = [
+    "pytest>=7",
+]
 
 [tool.setuptools.packages.find]
 include = ["sindae*"]
 
 [project.urls]
 Homepage = "https://github.com/llueg/SiNDAE"
-Documentation = "https://<you>.github.io/SiNDAE"
+Documentation = "[TODO: Add real documentation link]"
 Issues = "https://github.com/llueg/SiNDAE/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running end-to-end and scalability tests (deselect with -m 'not slow')",
+]
