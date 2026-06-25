@@ -18,6 +18,8 @@ repository:
 
 project:
   github: llueg/SiNDAE/
+  binder:
+    url: https://mybinder.org/v2/gh/llueg/SiNDAE/ci-setup
 
 parse:
   myst_enable_extensions:
