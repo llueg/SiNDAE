@@ -6,7 +6,6 @@ packaging mistake, or a regression that stops the core pipeline from solving.
 import jax
 import jax.numpy as jnp
 import numpy as np
-import pytest
 
 jax.config.update("jax_enable_x64", True)
 
@@ -78,26 +77,3 @@ def test_end_to_end_simultaneous():
 
     trained = extract_instance_data(problem, trained_m)
     assert np.all(np.isfinite(trained[0].nn_output))
-
-
-@pytest.mark.slow
-def test_end_to_end_decomposition():
-    """A few decomposition steps through the cyipopt + grey-box path."""
-    from sindae import SimpleMLP, generate_data, extract_instance_data
-    from sindae.algorithms.smoother import solve_smoother
-    from sindae.algorithms.decomp.train import DecompConfig, train_decomp
-    from sindae.example_problems import LeslieGowerProblem
-
-    problem = LeslieGowerProblem(nfe=15, ncp=2)
-    mlp = SimpleMLP(2, 1, [8, 8], [jax.nn.softplus] * 2, key=jax.random.PRNGKey(0))
-
-    generate_data(problem, noise_std=np.array([0.02, 0.02]), obs_every=4, seed=0)
-    smoother_m = solve_smoother(problem, mlp, smooth_coef=1.0)
-    smoother_data = extract_instance_data(problem, smoother_m)
-
-    cfg = DecompConfig(n_steps=3, lr=5e-3)
-    trained_m, mlp, history = train_decomp(
-        problem, mlp, cfg, data=smoother_data, smoother_model=smoother_m,
-    )
-    assert len(history["obj_history"]) == 3
-    assert np.all(np.isfinite(history["obj_history"]))

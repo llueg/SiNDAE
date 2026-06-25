@@ -1,8 +1,8 @@
 # Quickstart Guide
 
-This page walks through a complete training run on the Leslie-Gower predator–prey example,
+This page walks through a simple training run on the Leslie-Gower predator–prey example,
 from data generation to trained model. The same workflow applies to all built-in and
-custom problems.
+custom problems. See walkthroughs in [Examples Gallery](examples_gallery/index.md) for detailed explainations.
 
 ## Prerequisites
 
@@ -65,7 +65,7 @@ data = generate_data(
 )
 ```
 
-`generate_data` solves the true model with IPOPT, adds noise, and stores
+`generate_data` solves the true model with POUNCE, adds noise, and stores
 `problem.obs_times` / `problem.obs_values` in-place.
 
 ---

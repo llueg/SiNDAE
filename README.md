@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 [![arXiv](https://img.shields.io/badge/arXiv-2504.04665-b31b1b.svg)](https://arxiv.org/abs/2504.04665)
+[![CI](https://github.com/llueg/SiNDAE/actions/workflows/ci.yml/badge.svg)](https://github.com/llueg/SiNDAE/actions/workflows/ci.yml)
 
 **SiNDAE** is a Python package for hybrid modeling of dynamical systems. It learns
 unknown nonlinear terms in ODE and DAE systems directly from data by embedding a
@@ -34,28 +35,26 @@ equations*](https://arxiv.org/abs/2504.04665) (Lueg et al., 2025).
 
 ## Installation
 
-### conda (recommended)
+> **Coming soon to PyPI.** Until then, use the development install from source below.
+
+```bash
+pip install sindae            # core: the simultaneous (POUNCE) workflow
+pip install "sindae[full]"    # adds cyipopt and mpi4py for decomposition, GBM, inference, MPI
+```
+
+The core install is pure pip wheels with no system libraries or licenses. The `full`
+extra adds `cyipopt` and `mpi4py`, whose wheels are platform-dependent; if they do
+not build, install those two from conda-forge and `pip install sindae` into the same
+environment. See [`docs/installation.md`](docs/installation.md) for the conda route,
+GPU/Apple Silicon, and troubleshooting.
+
+For a development install from source:
 
 ```bash
 git clone https://github.com/llueg/SiNDAE.git
 cd SiNDAE
-conda env create -f environment.yml
-conda activate sindae
+pip install -e ".[full,test]"
 ```
-
-### pip
-
-```bash
-git clone https://github.com/llueg/SiNDAE.git
-cd SiNDAE
-pip install -e ".[full]"     # omit [full] to skip cyipopt and MPI
-```
-
-The `full` extra adds `cyipopt` and `mpi4py`, which are needed for the decomposition
-approach, the grey-box simultaneous variant, and inference. Their wheels are
-platform-dependent, so the conda route is preferred. See
-[`docs/installation.md`](docs/installation.md) for GPU/Apple Silicon, MPI, and
-troubleshooting notes.
 
 ## Quickstart
 

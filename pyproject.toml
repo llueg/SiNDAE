@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=61"]
+# >=77 for PEP 639 SPDX `license`/`license-files` support (the form used below).
+# Older setuptools errors on that metadata, which breaks `pip install` in
+# build-isolated environments like Binder/repo2docker.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]

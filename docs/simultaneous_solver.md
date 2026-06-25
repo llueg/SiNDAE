@@ -1,28 +1,37 @@
 # Simultaneous Solver
 
-In the simultaneous approach, NN parameters $\theta$ are treated as **additional decision
-variables** in the collocation NLP. IPOPT (via POUNCE or cyipopt) optimises states, NN outputs,
-and network weights jointly in a single solve — no outer training loop is required.
+In the simultaneous approach, the network parameters $\boldsymbol{\theta}$ are treated as
+**additional decision variables** in the collocation NLP. The solver (POUNCE or cyipopt)
+optimises the differential states $\mathbf{x}$, the algebraic variables $\mathbf{y}$ and
+$\mathbf{z}$, the static parameters $\mathbf{p}$, and the weights $\boldsymbol{\theta}$ jointly in
+a single solve.
 
 ---
 
 ## Mathematical Formulation
 
-After Radau collocation, the simultaneous NLP reads:
+After Radau collocation, the simultaneous NLP (eq. 6 of {cite}`lueg2025simultaneous`) reads:
 
 $$
-\min_{\theta,\, \mathbf{x},\, \mathbf{z}} \quad
-\sum_{k} \bigl\| x(\tau_k) - \hat{x}_k \bigr\|^2
-+ \lambda_\text{reg} \|\theta\|^2
+\min_{\boldsymbol{\theta},\, \mathbf{p},\, \{\mathbf{x},\mathbf{y},\mathbf{z}\}} \quad
+\sum_{s \in \mathcal{S}} \varphi^{(s)}\bigl(\mathbf{x}^{(s)}\bigr) + \alpha_r\, r(\boldsymbol{\theta}),
 $$
 
+subject to, at each collocation point $(i, k)$ of every scenario $s \in \mathcal{S}$,
+
 $$
-\text{s.t.} \quad \text{collocation constraints on } (x, z), \quad
-z(t_i, \cdot) = \phi_\theta\bigl(\xi(t_i, \cdot)\bigr), \quad \forall\, i.
+\begin{aligned}
+\sum_j \mathbf{x}_{ij}^{(s)}\, \ell_j'(\tau_k) &= h_i\, \mathbf{f}\bigl(\mathbf{x}_{ik}^{(s)}, \mathbf{y}_{ik}^{(s)}, \mathbf{z}_{ik}^{(s)}, \mathbf{p}\bigr), && \text{(collocation)} \\
+0 &= \mathbf{h}\bigl(\mathbf{x}_{ik}^{(s)}, \mathbf{y}_{ik}^{(s)}, \mathbf{z}_{ik}^{(s)}, \mathbf{p}\bigr), && \text{(algebraic)} \\
+\mathbf{z}_{ik}^{(s)} &= \mathbf{f}_{NN}\bigl(\mathbf{v}_{ik}^{(s)}, \boldsymbol{\theta}\bigr). && \text{(network)}
+\end{aligned}
 $$
 
-The NN is embedded symbolically — either via **expression-writing** (exact Hessian) or as a
-**grey-box model** (GBM, Jacobian-only, L-BFGS).
+Here $\varphi^{(s)}$ is the data-fit loss and $\mathbf{f}_{NN}$, $\mathbf{f}$, $\mathbf{h}$ follow the
+[Hybrid DAE Overview](hybrid_dae_overview.md). The term
+$r(\boldsymbol{\theta}) = \tfrac{1}{2}\|\boldsymbol{\theta}\|_2^2$ is an L2 regularizer with weight
+$\alpha_r$ (the `reg_coef` argument). The network constraint is embedded symbolically, either by
+**expression-writing** (exact Hessian) or as a **grey-box model** (GBM, Jacobian-only, L-BFGS).
 
 ---
 
@@ -33,12 +42,12 @@ The NN is embedded symbolically — either via **expression-writing** (exact Hes
 NN computations are written as explicit Pyomo expressions. This exposes the exact second-order
 structure to IPOPT, enabling the full Hessian and typically faster convergence.
 
-Solver: `SolverFactory('pounce')` — a pure-Rust IPOPT port installed as `pounce-solver`.
+Solver: `SolverFactory('pounce')`.
 
 ### Grey-box model (`use_gbm=True`)
 
 The NN forward pass is wrapped in a `NNSimulGreyBoxModel` (a `PyNumero`
-`ExternalGreyBoxModel`). Only Jacobian-vector products are provided; the Hessian is
+`ExternalGreyBoxModel`). Only Jacobian-vector products are provided and the Hessian is
 approximated via **L-BFGS**. Slower per iteration but scales better to large networks.
 
 Solver: `SolverFactory('cyipopt')`.
@@ -85,7 +94,7 @@ initial point, significantly reducing iteration count.
 
 ---
 
-## IPOPT Options
+## POUNCE Options
 
 Common options for the expression-writing path:
 

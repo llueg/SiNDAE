@@ -8,6 +8,11 @@ project:
   authors:
     - name: Laurens Lueg
     - name: Nicolas Smits
+  github: https://github.com/llueg/SiNDAE/
+  jupyter:
+    binder:
+      repo: https://github.com/llueg/SiNDAE/
+      ref: ci-setup/
   bibliography:
     - docs/references.bib
   exclude:

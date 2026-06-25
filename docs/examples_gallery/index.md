@@ -8,14 +8,14 @@ themselves. Pick the one that matches what you want to do.
 
 ## Notebooks
 
-### [Four-Tank Hydraulic Network](four_tank_example.ipynb)
+### [Four-Tank Hydraulic Network (Simultaneous)](four_tank_example.ipynb)
 
 A four-state, **index-2 DAE** with five algebraic flow variables. The NN replaces
 two nonlinear hydraulic relations. Demonstrates the end-to-end **simultaneous**
 workflow: defining a DAE `ProblemDefinition`, data generation, smoother,
 pre-training, training, and inference on new initial conditions.
 
-### [Leslie-Gower Predator-Prey](leslie_gower_example.ipynb)
+### [Leslie-Gower Predator-Prey (Decomposition)](leslie_gower_example.ipynb)
 
 A two-state ODE trained with the **decomposition** approach. Demonstrates adding a
 **custom path constraint** (a Lyapunov descent inequality) to embed mechanistic
