@@ -57,7 +57,7 @@ include = ["sindae*"]
 
 [project.urls]
 Homepage = "https://github.com/llueg/SiNDAE"
-Documentation = "[TODO: Add real documentation link]"
+Documentation = "https://llueg.github.io/SiNDAE"
 Issues = "https://github.com/llueg/SiNDAE/issues"
 
 [tool.pytest.ini_options]
