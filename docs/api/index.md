@@ -21,24 +21,14 @@ sindae.train_decomp          # via sindae.algorithms.decomp.train
 
 | Module | Key symbols |
 |--------|-------------|
-| {doc}`problem` | `ProblemDefinition` |
-| {doc}`data_utils` | `TrajectoryData`, `InstanceData`, `extract_instance_data`, `generate_data` |
-| {doc}`nn_utils` | `SimpleMLP`, `flatten_fn`, `make_unflatten_fn` |
-| {doc}`pretrain` | `PretrainConfig`, `pretrain_mlp` |
-| {doc}`smoother` | `build_smoother_model`, `solve_smoother` |
-| {doc}`simultaneous` | `build_simultaneous_model`, `solve_simultaneous`, `extract_mlp` |
-| {doc}`decomp` | `DecompConfig`, `train_decomp`, `build_decomp_model` |
-| {doc}`inference` | `make_inference_model`, `solve_inference` |
+| [problem](problem.md) | `ProblemDefinition` |
+| [data_utils](data_utils.md) | `TrajectoryData`, `InstanceData`, `extract_instance_data`, `generate_data` |
+| [nn_utils](nn_utils.md) | `SimpleMLP`, `flatten_fn`, `make_unflatten_fn` |
+| [pretrain](pretrain.md) | `PretrainConfig`, `pretrain_mlp` |
+| [smoother](smoother.md) | `build_smoother_model`, `solve_smoother` |
+| [simultaneous](simultaneous.md) | `SimultaneousConfig`, `build_simultaneous_model`, `solve_simultaneous`, `extract_mlp` |
+| [decomp](decomp.md) | `DecompConfig`, `train_decomp`, `build_decomp_model` |
+| [inference](inference.md) | `make_inference_model`, `solve_inference` |
 
-```{toctree}
-:hidden:
-
-problem
-data_utils
-nn_utils
-pretrain
-smoother
-simultaneous
-decomp
-inference
-```
+The full end-to-end workflow — problem → smoother → pre-training → training → inference —
+is shown in the [examples gallery](../examples_gallery/index.md).

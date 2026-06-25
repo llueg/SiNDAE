@@ -1,116 +1,111 @@
 # Installation
 
+SiNDAE is published on PyPI and installs with `pip`. conda is offered as an
+alternative for platforms where the optional binary dependencies (`cyipopt`,
+`mpi4py`) are easier to obtain as pre-built packages.
+
 ## Requirements
 
-- **Python ≥ 3.9** (3.11 recommended)
-- **conda** (recommended) or **pip** in a virtual environment
-- macOS, Linux, or Windows (WSL2 recommended on Windows)
+- **Python 3.11 or newer**
+- **pip** (recommended) or **conda**
+- Linux, macOS, or Windows (WSL2 recommended on Windows)
 
-The full install includes:
-
-| Component | Purpose |
-|-----------|---------|
-| `numpy`, `scipy`, `matplotlib` | Numerics and plotting |
-| `jax`, `jaxlib` | Automatic differentiation (CPU by default) |
-| `equinox`, `optax` | Neural network layers and optimizers |
-| `pyomo` | Symbolic DAE model building and collocation |
-| `pounce-solver` | IPOPT-compatible NLP solver (pure-Rust wheels, no HSL) |
-| `feral-solver` | Sparse symmetric KKT solver for the decomp gradient (pure-Rust) |
-| `cyipopt` | Python interface to IPOPT with MUMPS — needed for decomp and GBM variants |
-| `mpi4py` | MPI parallelism for multi-trajectory decomp training |
-
----
-
-## Option A — conda (recommended)
-
-Conda installs `cyipopt` and `mpi4py` from conda-forge with pre-built IPOPT+MUMPS and
-OpenMPI binaries, avoiding any compilation step.
-
-### 1. Clone the repository
+We recommend installing into a fresh virtual environment so SiNDAE and its
+dependencies do not interfere with other projects:
 
 ```bash
-git clone https://github.com/TODO/SiNDAE.git
-cd SiNDAE
+python -m venv .venv
+source .venv/bin/activate       # macOS / Linux
+# .venv\Scripts\activate        # Windows
 ```
 
-### 2. Create and activate the environment
+## Install with pip (recommended)
+
+### Core install
+
+```bash
+pip install sindae
+```
+
+This pulls the core stack (`numpy`, `scipy`, `jax`, `equinox`, `optax`, `pyomo`,
+`matplotlib`) together with the pure-Rust solvers
+[POUNCE](https://github.com/jkitchin/pounce) and
+[FERAL](https://github.com/jkitchin/feral), which install from wheels with no
+system libraries and no license. The core install is enough to run the full
+**simultaneous** training workflow (problem, smoother, training, and plotting).
+
+### Full install
+
+```bash
+pip install "sindae[full]"
+```
+
+The `full` extra adds `cyipopt` and `mpi4py`, which are required for the
+**decomposition** approach, the grey-box simultaneous variant, inference, and MPI
+parallelism. Their wheels depend on your platform; if either fails to build from
+pip, use the conda route below for those two packages.
+
+## Install with conda (alternative)
+
+conda-forge ships pre-built binaries for the dependencies that are awkward to build
+with pip: `cyipopt` (bundled with IPOPT and MUMPS, no HSL license) and `mpi4py`
+(linked against OpenMPI). Install those with conda, then install SiNDAE itself with
+pip:
+
+```bash
+conda create -n sindae python=3.11
+conda activate sindae
+conda install -c conda-forge cyipopt mpi4py
+pip install sindae
+```
+
+## Packages
+
+| Component | Install | Purpose |
+|-----------|---------|---------|
+| `numpy`, `scipy`, `matplotlib` | core | Numerics and plotting |
+| `jax`, `jaxlib` | core | Automatic differentiation (CPU by default) |
+| `equinox`, `optax` | core | Neural network layers and optimizers |
+| `pyomo` | core | Symbolic DAE model building and collocation |
+| `pounce-solver` | core | IPOPT-compatible NLP solver (pure-Rust wheels, no HSL) |
+| `feral-solver` | core | Sparse symmetric KKT solver for the decomposition gradient |
+| `cyipopt` | `[full]` | IPOPT with MUMPS, used by decomposition, GBM, and inference |
+| `mpi4py` | `[full]` | MPI parallelism for multi-trajectory decomposition training |
+
+## GPU and accelerator support (optional)
+
+By default JAX runs on CPU. To use a GPU or Apple Silicon, install the matching JAX
+build after installing SiNDAE:
+
+```bash
+pip install -U "jax[cuda12]"     # NVIDIA GPU (CUDA 12)
+pip install -U "jax[metal]"      # Apple Silicon (Metal)
+```
+
+## Development install (from source)
+
+To contribute or to run the test suite, install an editable copy from a clone. The
+`test` extra adds `pytest`:
+
+```bash
+git clone https://github.com/llueg/SiNDAE.git
+cd SiNDAE
+pip install -e ".[full,test]"
+```
+
+The repository also ships an `environment.yml` for a one-command conda development
+environment (Python, `cyipopt`, `mpi4py`, and an editable install):
 
 ```bash
 conda env create -f environment.yml
 conda activate sindae
 ```
 
-This installs all core and optional dependencies. There may be a few OS-level
-permission prompts for the ASL solver binaries.
-
-### 3. Install SiNDAE in editable mode
-
-The `environment.yml` already runs `pip install -e .` automatically. If you need to
-reinstall manually:
+Run the fast test suite with:
 
 ```bash
-pip install -e .
+pytest
 ```
-
----
-
-## Option B — pip in a virtual environment
-
-Use this if you do not have conda. MPI support requires a system MPI
-(e.g. `brew install open-mpi` on macOS); `cyipopt` wheels are platform-specific.
-
-### 1. Clone and enter the repository
-
-```bash
-git clone https://github.com/TODO/SiNDAE.git
-cd SiNDAE
-```
-
-### 2. Create a virtual environment
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate    # macOS / Linux
-# .venv\Scripts\activate     # Windows
-```
-
-### 3. Install dependencies
-
-Core only (no MPI, no cyipopt):
-
-```bash
-pip install -e .
-```
-
-Full install including cyipopt and mpi4py:
-
-```bash
-pip install -e ".[full]"
-```
-
-macOS — install OpenMPI for MPI support:
-
-```bash
-brew install open-mpi
-```
-
----
-
-## GPU / Accelerator support (optional)
-
-By default, JAX runs on CPU. To enable GPU or Apple Silicon acceleration, replace
-the `jax[cpu]` install with the appropriate variant **before** or **after** the
-environment setup:
-
-```bash
-# NVIDIA GPU (CUDA 12)
-pip install -U "jax[cuda12]"
-
-# Apple Silicon (Metal)
-pip install -U "jax[metal]"
-```
-
----
 
 ## Verify the installation
 
@@ -119,35 +114,32 @@ import sindae
 import jax
 import pyomo.environ as pyo
 
-# Confirm JAX 64-bit is available
-jax.config.update('jax_enable_x64', True)
-print(jax.devices())
+jax.config.update("jax_enable_x64", True)
+print("JAX devices:", jax.devices())
 
-# Confirm POUNCE is on PATH
-solver = pyo.SolverFactory('pounce')
-print("POUNCE available:", solver.available())
+# POUNCE backs the simultaneous workflow (core install).
+print("POUNCE available:", pyo.SolverFactory("pounce").available())
 
-# Confirm cyipopt (optional — only needed for decomp / inference)
+# cyipopt is optional (full install); only needed for decomposition / inference.
 try:
-    cy = pyo.SolverFactory('cyipopt')
-    print("cyipopt available:", cy.available())
-except Exception as e:
-    print("cyipopt not available:", e)
+    print("cyipopt available:", pyo.SolverFactory("cyipopt").available())
+except Exception as exc:
+    print("cyipopt not available:", exc)
 ```
-
----
 
 ## Troubleshooting
 
-**`pounce not available`** — ensure the conda/venv environment is activated;
-`pounce-solver` places the `pounce` binary in `$CONDA_PREFIX/bin` or `.venv/bin`.
+**`pounce` not available.** Make sure your virtual environment is active.
+`pounce-solver` installs the `pounce` executable into the environment's `bin`
+directory, which must be on `PATH`.
 
-**`cyipopt` import error on pip install** — use the conda route (Option A). The
-pip wheel for `cyipopt` bundles a pre-built IPOPT+MUMPS only for specific
-OS/architecture combinations.
+**`cyipopt` fails to build from pip.** Its wheels are platform-specific. Install it
+from conda-forge instead (`conda install -c conda-forge cyipopt`), then
+`pip install sindae` into the same environment.
 
-**JAX `float32` warnings** — call `jax.config.update('jax_enable_x64', True)` at
-the top of your script or set `JAX_ENABLE_X64=1` in your shell.
+**JAX emits `float32` warnings.** Set 64-bit mode at the top of your script with
+`jax.config.update("jax_enable_x64", True)`, or set `JAX_ENABLE_X64=1` in your shell.
 
-**MPI `mpirun: command not found`** — install OpenMPI:
-`brew install open-mpi` (macOS) or `sudo apt install libopenmpi-dev` (Ubuntu).
+**`mpirun: command not found`.** Install an MPI implementation: OpenMPI via
+`conda install -c conda-forge openmpi`, `brew install open-mpi` (macOS), or
+`sudo apt install libopenmpi-dev` (Ubuntu).

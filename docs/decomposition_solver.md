@@ -1,36 +1,55 @@
 # Decomposition Solver
 
-The decomposition approach decouples the NN parameter update from the DAE solve. It alternates
-between:
+The decomposition approach is a **bi-level** scheme that decouples the network-parameter update
+from the DAE solve. It alternates between:
 
-1. **Inner step** — fix $\theta$, solve the DAE NLP via cyipopt + Grey-Box Model (GBM).
-2. **Outer step** — fix the DAE solution, compute $\nabla_\theta \mathcal{L}$ via
-   **implicit differentiation of the KKT conditions**, and take an Adam step on $\theta$.
+1. **Inner step:** fix $\boldsymbol{\theta}$ and solve the per-scenario DAE NLP via cyipopt with a
+   Grey-Box Model (GBM) of the network.
+2. **Outer step:** compute $\nabla_{\boldsymbol{\theta}} \Phi$ by **implicit differentiation of the
+   inner KKT conditions** and take an Adam step on $\boldsymbol{\theta}$.
 
-This mirrors the structure of implicit-function-theorem-based meta-learning and bi-level
-optimisation, applied here to a physics-informed setting.
+This follows the bi-level formulation of {cite}`lueg2025simultaneous`, applied here to a
+physics-informed setting.
 
 ---
 
 ## Algorithm
 
-For each outer iteration $k$:
+The outer problem minimizes
 
 $$
-\theta^{k+1} = \theta^k - \alpha_k \cdot \text{Adam}\!\left(\nabla_\theta \mathcal{L}(\theta^k)\right)
+\Phi(\boldsymbol{\theta}) = \alpha_r\, r(\boldsymbol{\theta}) + \sum_{s \in \mathcal{S}} \varphi^{(s)}\bigl(\tilde{\mathbf{x}}^{(s)}(\boldsymbol{\theta})\bigr),
 $$
 
-The gradient $\nabla_\theta \mathcal{L}$ is obtained by:
+where $\tilde{\mathbf{x}}^{(s)}(\boldsymbol{\theta})$ is the solution of the inner DAE NLP for scenario
+$s$ at the current weights, and $r(\boldsymbol{\theta}) = \tfrac{1}{2}\|\boldsymbol{\theta}\|_2^2$ with
+weight $\alpha_r$ (`param_reg_coef`). Each outer iteration takes an Adam step,
 
-1. Solving the inner NLP:
-   $\min_{x,z} \mathcal{L}_\text{data}(x) + \lambda_\text{slack} \|z - \phi_\theta(\xi)\|_1$
-2. Extracting KKT multipliers.
-3. Back-solving the linearised KKT system (via **FERAL** — a pure-Rust sparse LDL^T
-   solver) to obtain $\partial (x^*, z^*) / \partial \theta$.
-4. Applying the chain rule.
+$$
+\boldsymbol{\theta} \leftarrow \boldsymbol{\theta} - \alpha\, \mathrm{Adam}\bigl(\nabla_{\boldsymbol{\theta}} \Phi\bigr).
+$$
 
-The $\ell_1$ slack relaxation (`slack_coef`) ensures the inner NLP is feasible even when
-$\phi_\theta$ is a poor approximation early in training.
+**Inner subproblem.** For fixed $\boldsymbol{\theta}$, the network constraint is relaxed with
+non-negative $\ell_1$ slack variables $\boldsymbol{\Delta}^{\pm}$,
+
+$$
+\mathbf{z}_{ik}^{(s)} - \mathbf{f}_{NN}\bigl(\mathbf{v}_{ik}^{(s)}, \boldsymbol{\theta}\bigr) = \boldsymbol{\Delta}^{+}_{ik} - \boldsymbol{\Delta}^{-}_{ik},
+$$
+
+penalized in the inner objective with weight `slack_coef`. The relaxation keeps the inner NLP
+feasible even when $\mathbf{f}_{NN}$ is a poor approximation early in training.
+
+**Outer gradient.** Differentiating $\Phi$ gives
+
+$$
+\frac{d\Phi}{d\boldsymbol{\theta}} = \alpha_r \frac{dr}{d\boldsymbol{\theta}}
++ \sum_{s \in \mathcal{S}} \nabla_{\boldsymbol{\theta}} \tilde{\mathbf{x}}^{(s)}(\boldsymbol{\theta})^{\top} \frac{d\varphi^{(s)}}{d\tilde{\mathbf{x}}^{(s)}}.
+$$
+
+The sensitivity $\nabla_{\boldsymbol{\theta}} \tilde{\mathbf{x}}^{(s)}$ comes from implicit
+differentiation of the inner KKT system: the linearized KKT matrix is factorized once per outer
+iteration with **FERAL** (a pure-Rust sparse symmetric-indefinite LDL$^{\top}$ solver), and the
+network terms enter through vector-Jacobian products evaluated by automatic differentiation.
 
 ---
 
@@ -117,12 +136,12 @@ Run with: `mpirun -n 4 python train.py`
 - Many independent training trajectories (MPI parallelism).
 - When you want fine-grained control over the training schedule.
 
-For small-to-medium networks with few trajectories, the {doc}`simultaneous_solver` is
+For small-to-medium networks with few trajectories, the [](simultaneous_solver.md) is
 simpler and often faster.
 
 ---
 
 ## API Reference
 
-See {doc}`api/decomp` for `DecompConfig`, `train_decomp`, and `build_decomp_model`.
-See {doc}`api/pretrain` for `PretrainConfig` and `pretrain_mlp`.
+See [](api/decomp.md) for `DecompConfig`, `train_decomp`, and `build_decomp_model`.
+See [](api/pretrain.md) for `PretrainConfig` and `pretrain_mlp`.

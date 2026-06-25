@@ -14,6 +14,7 @@ chapters:
       - file: api/problem
       - file: api/data_utils
       - file: api/nn_utils
+      - file: api/network_architecture
       - file: api/pretrain
       - file: api/smoother
       - file: api/simultaneous
@@ -25,4 +26,6 @@ chapters:
       - file: examples_gallery/four_tank_example
       - file: examples_gallery/leslie_gower_example
       - file: examples_gallery/fedbatch_example
+      - file: examples_gallery/fedbatch_partial_obs_example
+      - file: examples_gallery/fedbatch_validation_example
   - file: bibliography

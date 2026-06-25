@@ -21,4 +21,7 @@ from sindae.algorithms.simultaneous.train import SimultaneousConfig as Simultane
 from sindae.algorithms.simultaneous.train import solve_simultaneous as solve_simultaneous
 from sindae.algorithms.inference import make_inference_model as make_inference_model
 from sindae.algorithms.inference import solve_inference as solve_inference
-from sindae.plot_utils import plot_instance_data, plot_training_histor
+from sindae.plot_utils import plot_instance_data, plot_training_history
+from sindae.example_problems import FourTankProblem, LeslieGowerProblem, FedBatchBioreactorProblem
+from importlib.metadata import version
+__version__ = version("sindae")
