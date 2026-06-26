@@ -40,7 +40,9 @@ from sindae.data_utils import InstanceData
 plt.rcParams['figure.dpi'] = 300
 plt.rcParams['font.size'] = 14
 plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['font.sans-serif'] = ['Arial']
+# Arial preferred (paper figures); fall back to DejaVu Sans (matplotlib's bundled
+# default) on systems without Arial — e.g. Binder — to avoid findfont warnings.
+plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans']
 plt.rcParams['axes.labelsize'] = 14
 plt.rcParams['axes.titlesize'] = 14
 plt.rcParams['xtick.labelsize'] = 12

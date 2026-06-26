@@ -15,13 +15,16 @@ channels:
 dependencies:
   - python=3.11
   - cyipopt>=1.4          # IPOPT+MUMPS; needed by decomp / GBM-simultaneous / inference
+  - pyomo>=6.7            # from conda-forge: bundles the compiled PyNumero ASL
+                          # interface (pynumero_ASL). The PyPI/pip wheel does NOT,
+                          # so the GBM/decomp solves fail with "Cannot load the
+                          # PyNumero ASL interface" when pyomo is pip-installed.
   - pip
   - pip:
       - jax[cpu]>=0.4.30
       - jaxlib>=0.4.30
       - equinox>=0.11
       - optax>=0.2
-      - pyomo>=6.7
       - pounce-solver>=0.4
       - feral-solver>=0.9
       - numpy>=1.24
