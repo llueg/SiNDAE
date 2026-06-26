@@ -7,12 +7,13 @@ project:
   keywords: ["scientific machine learning", "neural ODE", "DAE", "implicit differentiation", "UDE"]
   authors:
     - name: Laurens Lueg
+    - name: Victor Alves
     - name: Nicolas Smits
   github: https://github.com/llueg/SiNDAE/
   jupyter:
     binder:
-      repo: https://github.com/llueg/SiNDAE/
-      ref: ci-setup/
+      repo: llueg/SiNDAE
+      ref: history-merge
   bibliography:
     - docs/references.bib
   exclude:

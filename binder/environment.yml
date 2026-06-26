@@ -28,4 +28,7 @@ dependencies:
       - scipy>=1.10
       - matplotlib>=3.7
       - pandas>=2.0         # the fed-batch notebook loads measurements via pandas
-      - .
+# NOTE: the sindae package itself is installed in binder/postBuild, NOT here.
+# `pip install .` inside a conda environment.yml is unreliable on repo2docker
+# (the pip subsection's working directory is not guaranteed to be the repo root,
+# which makes `.` fail with "Neither 'setup.py' nor 'pyproject.toml' found").
