@@ -30,6 +30,7 @@ import numpy as np
 
 import pyomo.environ as pyo
 from pyomo.contrib.interior_point.interface import InteriorPointInterface
+from pyomo.contrib.interior_point.linalg.ma27_interface import InteriorPointMA27Interface
 from pyomo.contrib.interior_point.linalg.scipy_interface import ScipyInterface
 from sindae.interfaces.feral_interface import FeralInterface
 from pyomo.contrib.pynumero.linalg.base import LinearSolverStatus
@@ -95,7 +96,7 @@ def make_summed_mixed_vjp_fn(mixed_vjp_fn):
 # Linear solver helpers
 # ---------------------------------------------------------------------------
 
-def init_linear_solver(linear_solver: FeralInterface,
+def init_linear_solver(linear_solver: FeralInterface | InteriorPointMA27Interface | ScipyInterface,
                        interface: InteriorPointInterface):
     kkt_matrix = interface.evaluate_primal_dual_kkt_matrix()
     res = linear_solver.do_symbolic_factorization(kkt_matrix)

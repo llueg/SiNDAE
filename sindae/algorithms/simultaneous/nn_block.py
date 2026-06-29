@@ -12,12 +12,10 @@ from sindae.nn_utils import SimpleMLP, _act_jax2str, _act_str2jax
 def _act_str2pyo(activation: str) -> Callable:
     if activation == "tanh":
         return pe.tanh
-        # return lambda x: 1 - 2 / (1 + pe.exp(2 * x))
     elif activation == "softplus":
         return lambda x: pe.log(1 + pe.exp(x))
     elif activation == "swish":
         return lambda x: 0.5 * x * pe.tanh(0.5 * x) + 0.5 * x
-        # return lambda x: x / (1 + pe.exp(-x))
     elif activation is None:
         return lambda x: x
     else:

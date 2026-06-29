@@ -16,6 +16,9 @@ tests/migration_tests
 .claude/
 .pytest_cache/
 CHANGES.md
+CLAUDE.md
+CONTEXT.md
+dev/
 
 # MyST build outputs
 _build

@@ -1,6 +1,6 @@
 # Jupyter Book configuration — https://jupyterbook.org/customize/config.html
 title: SiNDAE
-author: Laurens Lueg, Nicolas Smits
+author: Laurens Lueg, Victor Alves, Nicolas Smits
 copyright: "2025"
 logo: ""
 
@@ -19,7 +19,7 @@ repository:
 project:
   github: llueg/SiNDAE/
   binder:
-    url: https://mybinder.org/v2/gh/llueg/SiNDAE/ci-setup
+    url: https://mybinder.org/v2/gh/llueg/SiNDAE/history-merge
 
 parse:
   myst_enable_extensions:

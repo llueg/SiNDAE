@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 METHOD   = 'simul'   # 'decomp' | 'simul'
 # simul options
-USE_GBM  = True      # whether to use GBM in simultaneous training
+USE_GBM  = True   # whether to use GBM in simultaneous training
 HESS_APPROX = 'limited-memory'
 if USE_GBM:
     HESS_APPROX = 'limited-memory'  # GBM only implemented for jacobian
