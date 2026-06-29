@@ -50,22 +50,57 @@ class FeralInterface(IPLinearSolverInterface):
     def getLoggerName(cls):
         return 'feral'
 
-    def __init__(self, iterative_refinement: bool = True):
+    def __init__(
+        self,
+        iterative_refinement: bool = True,
+        max_steps: Optional[int] = None,
+        refine_tol: float = 1e-12,
+    ):
+        """
+        Parameters
+        ----------
+        iterative_refinement
+            If ``False``, ``do_back_solve`` performs a single unrefined direct
+            solve. If ``True`` (default), iterative refinement is applied.
+        max_steps
+            Cap on the number of iterative-refinement steps in
+            ``do_back_solve``. ``None`` (default) defers to feral's built-in
+            ``solve_refined`` (its internal cap). An ``int`` instead runs a
+            manual refinement loop of at most ``max_steps`` steps; ``0``
+            disables refinement entirely. Ignored when
+            ``iterative_refinement`` is ``False``.
+        refine_tol
+            Relative residual tolerance for the manual refinement loop (used
+            only when ``max_steps`` is an ``int``). The loop stops early once
+            ``||r|| <= refine_tol * (1 + ||b||)``. A non-positive value
+            disables the early exit, so the loop always runs ``max_steps``
+            steps.
+        """
         self._solver = feral.Solver()
         self._csc: Optional[feral.CscMatrix] = None   # last factorized matrix
+        self._matrix = None                           # last matrix as scipy csc
         self._inertia: Optional[Tuple[int, int, int]] = None
         self._iterative_refinement = iterative_refinement
+        self._max_steps = max_steps
+        self._refine_tol = refine_tol
+        # Number of refinement steps the manual loop ran in the last
+        # do_back_solve; None when the loop was not used (solve_refined path).
+        self.last_refine_steps: Optional[int] = None
 
         self.logger = logging.getLogger('feral')
         self.logger.propagate = False
 
     @staticmethod
+    def _to_scipy_csc(matrix: Union[spmatrix, BlockMatrix]):
+        return matrix if isspmatrix_csc(matrix) else matrix.tocsc()
+
+    @staticmethod
     def _to_feral(matrix: Union[spmatrix, BlockMatrix]) -> feral.CscMatrix:
-        if not isspmatrix_csc(matrix):
-            matrix = matrix.tocsc()
         # The primal-dual KKT matrix is symmetric and stored fully;
         # feral reads the lower triangle.
-        return feral.from_scipy(matrix, symmetric='full')
+        return feral.from_scipy(
+            FeralInterface._to_scipy_csc(matrix), symmetric='full'
+        )
 
     def do_symbolic_factorization(
         self, matrix: Union[spmatrix, BlockMatrix], raise_on_error: bool = True
@@ -85,10 +120,12 @@ class FeralInterface(IPLinearSolverInterface):
     ) -> LinearSolverResults:
         res = LinearSolverResults()
         try:
-            a = self._to_feral(matrix)
+            a_scipy = self._to_scipy_csc(matrix)
+            a = feral.from_scipy(a_scipy, symmetric='full')
             status, inertia = self._solver.factor(a)
         except Exception as err:
             self._csc = None
+            self._matrix = None
             self._inertia = None
             if raise_on_error:
                 raise
@@ -97,6 +134,7 @@ class FeralInterface(IPLinearSolverInterface):
             return res
 
         self._csc = a
+        self._matrix = a_scipy  # for residuals in the manual refinement loop
         self._inertia = inertia.as_tuple()  # (n_pos, n_neg, n_zero)
 
         if status == feral.FactorStatus.SUCCESS:
@@ -127,10 +165,14 @@ class FeralInterface(IPLinearSolverInterface):
             _rhs = np.asarray(rhs, dtype=np.float64)
 
         try:
-            if self._iterative_refinement:
-                result = self._solver.solve_refined(self._csc, _rhs)
-            else:
+            if not self._iterative_refinement:
                 result = self._solver.solve(_rhs)
+                self.last_refine_steps = 0
+            elif self._max_steps is None:
+                result = self._solver.solve_refined(self._csc, _rhs)
+                self.last_refine_steps = None
+            else:
+                result, self.last_refine_steps = self._refined_solve(_rhs)
         except Exception as err:
             if raise_on_error:
                 raise
@@ -143,6 +185,24 @@ class FeralInterface(IPLinearSolverInterface):
             result = _result
 
         return result, LinearSolverResults(LinearSolverStatus.successful)
+
+    def _refined_solve(self, b: np.ndarray) -> Tuple[np.ndarray, int]:
+        """Iterative refinement capped at ``self._max_steps`` steps.
+
+        Returns the refined solution and the number of refinement steps run.
+        """
+        x = self._solver.solve(b)
+        b_norm = np.linalg.norm(b)
+        steps = 0
+        for _ in range(self._max_steps):
+            r = b - self._matrix @ x
+            if self._refine_tol > 0.0 and (
+                np.linalg.norm(r) <= self._refine_tol * (1.0 + b_norm)
+            ):
+                break
+            x = x + self._solver.solve(r)
+            steps += 1
+        return x, steps
 
     def get_inertia(self) -> Tuple[int, int, int]:
         if self._inertia is None:

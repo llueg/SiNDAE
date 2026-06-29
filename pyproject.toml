@@ -50,6 +50,11 @@ full = [
 test = [
     "pytest>=7",
 ]
+# Developer tooling. `pre-commit` manages the ruff hook (see
+# .pre-commit-config.yaml); ruff itself is fetched by pre-commit, not pinned here.
+dev = [
+    "pre-commit>=3",
+]
 
 [tool.setuptools.packages.find]
 include = ["sindae*"]
@@ -64,3 +69,8 @@ testpaths = ["tests"]
 markers = [
     "slow: long-running end-to-end and scalability tests (deselect with -m 'not slow')",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Package __init__ files deliberately re-export public API names, so their
+# imports read as "unused" (F401) to the linter. This is intentional.
+"__init__.py" = ["F401"]

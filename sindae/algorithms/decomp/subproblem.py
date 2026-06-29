@@ -38,7 +38,6 @@ import jax.numpy as jnp
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
-from pyomo.contrib.interior_point.linalg.scipy_interface import ScipyInterface
 from sindae.interfaces.feral_interface import FeralInterface
 
 import sindae.algorithms.decomp.kkt_utils as dutils

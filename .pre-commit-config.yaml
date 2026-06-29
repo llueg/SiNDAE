@@ -1,0 +1,10 @@
+# Pre-commit hooks for SiNDAE. Install with:
+#   pip install pre-commit && pre-commit install
+# The ruff hook below blocks commits that introduce unused imports (F401).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20  # pinned by `pre-commit autoupdate`
+    hooks:
+      - id: ruff
+        name: ruff (unused imports, F401)
+        args: ["--select=F401"]
