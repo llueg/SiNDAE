@@ -31,18 +31,16 @@ Expected model structure (produced by build_decomp_model)
 from __future__ import annotations
 
 import logging
-import os
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
-from sindae.interfaces.feral_interface import FeralInterface
 
 import sindae.algorithms.decomp.kkt_utils as dutils
 from sindae.algorithms.model_builder_utils import NORM_INPUT_NAME, NORM_OBS_NAME
-from sindae.algorithms.timing_utils import parse_pounce_log, set_output_file, tmp_log_path
+from sindae.solvers import make_linear_solver, make_nlp_solver
 from sindae.interfaces.interior_point_compat import InteriorPointInterface
 from sindae.interfaces.pyomo_grey_box_nlp_extended import PyomoNLPWithGreyBoxBlocksExtended
 
@@ -76,6 +74,9 @@ class TrajectoryBatchSubproblem:
     slack_coef : float
     param_reg_coef : float
     subsample_frac : float
+    linear_solver : str or IPLinearSolverInterface
+        KKT/linear solver for the gradient back-solve ('feral' default, 'ma27',
+        'scipy', or a pre-built interface).
     """
 
     def __init__(
@@ -90,6 +91,7 @@ class TrajectoryBatchSubproblem:
         slack_coef=1.0,
         subsample_frac=1.0,
         cyipopt_options=None,
+        linear_solver='feral',
     ):
         self._model         = model
         self._gbm           = gbm
@@ -104,11 +106,8 @@ class TrajectoryBatchSubproblem:
         # Precompile gradient; obj_fun_jax first arg is norm_obs
         self._grad_obj_jit = jax.jit(jax.grad(obj_fun_jax, argnums=(0, 1, 2)))
 
-        self._solver        = pyo.SolverFactory('cyipopt')
-        if cyipopt_options:
-            for k, v in cyipopt_options.items():
-                self._solver.config.options[k] = v
-        self._linear_solver = FeralInterface()
+        self._nlp_solver    = make_nlp_solver('cyipopt', cyipopt_options)
+        self._linear_solver = make_linear_solver(linear_solver)
         self._symbolic_done = False
 
         self._extended_nlp = None
@@ -166,11 +165,9 @@ class TrajectoryBatchSubproblem:
 
         # 2. Solve with cyipopt; return_nlp=True gives us the populated NLP
         _t('solve')
-        _log = tmp_log_path()
-        set_output_file(self._solver, _log, is_cyipopt=True)
-        _result, solved_nlp = self._solver.solve(self._model, return_nlp=True)
-        self._last_solve_info = parse_pounce_log(_log)
-        os.unlink(_log)
+        _res = self._nlp_solver.solve(self._model, return_nlp=True)
+        solved_nlp = _res.nlp
+        self._last_solve_info = _res.timing
         _lgrg = self._last_solve_info.get('last_lgrg')
         if _lgrg is not None and _lgrg != '-':
             _logger.warning(

@@ -100,7 +100,7 @@ and the GBM path (reads flat Pyomo Var values).
 ### `solve_simultaneous`
 
 ```python
-solve_simultaneous(problem: ProblemDefinition, mlp: SimpleMLP, cfg: SimultaneousConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, pounce_options: Optional[dict] = None, traj_indices: Optional[List[int]] = None, tee: bool = False, timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP]
+solve_simultaneous(problem: ProblemDefinition, mlp: SimpleMLP, cfg: SimultaneousConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, pounce_options: Optional[dict] = None, backend: Optional[str] = None, traj_indices: Optional[List[int]] = None, tee: bool = False, timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP]
 ```
 
 Build and solve the simultaneous NLP, returning the solved model and
@@ -114,6 +114,7 @@ the trained SimpleMLP.
 - **`data`** (`InstanceData`) — Provides normalization statistics (input_mean/std, output_mean/std).
 - **`smoother_model`** (`Optional[pyo.ConcreteModel]`, default `None`) — Solved smoother model to reuse (warm-starts the simultaneous solve and avoids rebuilding / re-discretising the model).
 - **`pounce_options`** (`Optional[dict]`, default `None`) — Extra solver options, e.g. ``{'max_iter': 500, 'tol': 1e-6, 'hessian_approximation': 'limited-memory'}``. Passed to POUNCE (expression-writing) or cyipopt (GBM) depending on ``cfg.use_gbm``.
+- **`backend`** (`Optional[str]`, default `None`) — NLP backend for the expression-writing path (``'pounce'`` default, ``'ipopt'`` / ``'cyipopt'``). Ignored when ``cfg.use_gbm`` is True: the grey-box model requires cyipopt.
 - **`traj_indices`** (`Optional[List[int]]`, default `None`)
 - **`tee`** (`bool`, default `False`) — Stream solver output to stdout.
 - **`timer`** (`Optional[HierarchicalTimer]`, default `None`) — Reuse an external timer; a fresh one is created when omitted.

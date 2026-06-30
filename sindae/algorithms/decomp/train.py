@@ -114,6 +114,7 @@ def train_decomp(
     smoother_model: Optional[pyo.ConcreteModel] = None,
     mpi_comm=None,
     cyipopt_options: Optional[dict] = None,
+    linear_solver: str = 'feral',
 ) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
     """
     Train a neural network via the decomposition (GBM + KKT gradient) approach.
@@ -135,6 +136,8 @@ def train_decomp(
     mpi_comm        : mpi4py.MPI.Comm, optional
     cyipopt_options : dict, optional
         Options passed to cyipopt, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
+    linear_solver   : str  (default ``'feral'``; ``'ma27'`` / ``'scipy'``)
+        KKT/linear solver for the decomposition gradient back-solve.
 
     Returns
     -------
@@ -207,6 +210,7 @@ def train_decomp(
         slack_coef=cfg.init_slack_coef,
         subsample_frac=cfg.subsample_frac,
         cyipopt_options=cyipopt_options,
+        linear_solver=linear_solver,
     )
 
     # Training loop

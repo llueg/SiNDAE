@@ -27,6 +27,7 @@ import numpy as np
 import pyomo.environ as pyo
 
 from sindae.problem import ProblemDefinition
+from sindae.solvers import make_nlp_solver
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,7 @@ def generate_data(
     seed: int = 0,
     noise_std: Optional[np.ndarray] = None,
     pounce_options: Optional[dict] = None,
+    backend: str = 'pounce',
     tee: bool = False,
 ) -> InstanceData:
     """
@@ -190,9 +192,11 @@ def generate_data(
     seed        : int
         RNG seed for reproducible noise.
     pounce_options : dict, optional
-        Extra POUNCE solver options, e.g. {'tol': 1e-9}.
+        Extra NLP solver options, e.g. {'tol': 1e-9}.
+    backend     : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
+        NLP solver backend used for the true-model solve.
     tee         : bool
-        Pass through to the POUNCE solver (print output if True).
+        Pass through to the NLP solver (print output if True).
 
     Returns
     -------
@@ -223,21 +227,18 @@ def generate_data(
     m.obj = pyo.Objective(expr=0.0)
 
     # ── Solve ─────────────────────────────────────────────────────────────────
-    solver = pyo.SolverFactory('pounce')
-    if pounce_options:
-        for k, v in pounce_options.items():
-            solver.options[k] = v
+    solver = make_nlp_solver(backend, pounce_options)
     try:
-        result = solver.solve(m, tee=tee)
+        result = solver.solve(m, tee=tee).result
     except Exception as e:
-        logger.warning(f"generate_data: POUNCE failed with error: {e}")
+        logger.warning(f"generate_data: solve failed with error: {e}")
         return None
     logger.info(
         f"generate_data: {result.solver.status} / "
         f"{result.solver.termination_condition}"
     )
     if result.solver.termination_condition != pyo.TerminationCondition.optimal:
-        logger.warning("generate_data: POUNCE did not solve to optimality; "
+        logger.warning("generate_data: solve did not reach optimality; "
                        "results may be unreliable.")
         return None
 

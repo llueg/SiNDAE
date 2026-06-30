@@ -50,6 +50,8 @@ The sensitivity $\nabla_{\boldsymbol{\theta}} \tilde{\mathbf{x}}^{(s)}$ comes fr
 differentiation of the inner KKT system: the linearized KKT matrix is factorized once per outer
 iteration with **FERAL** (a pure-Rust sparse symmetric-indefinite LDL$^{\top}$ solver), and the
 network terms enter through vector-Jacobian products evaluated by automatic differentiation.
+FERAL is the default; pass `linear_solver='ma27'` or `linear_solver='scipy'` to `train_decomp`
+to select an alternative (see [](api/solvers.md)).
 
 ---
 

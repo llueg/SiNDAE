@@ -17,14 +17,13 @@ Two sub-approaches are supported (controlled by ``SimultaneousConfig.use_gbm``):
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
 
-from sindae.algorithms.timing_utils import tmp_log_path, parse_pounce_log, set_output_file
+from sindae.solvers import make_nlp_solver
 
 from sindae.data_utils import InstanceData
 from sindae.nn_utils import SimpleMLP
@@ -52,6 +51,7 @@ def solve_simultaneous(
     data: InstanceData,
     smoother_model: Optional[pyo.ConcreteModel] = None,
     pounce_options: Optional[dict] = None,
+    backend: Optional[str] = None,
     traj_indices: Optional[List[int]] = None,
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
@@ -76,6 +76,10 @@ def solve_simultaneous(
         Extra solver options, e.g. ``{'max_iter': 500, 'tol': 1e-6,
         'hessian_approximation': 'limited-memory'}``.  Passed to POUNCE
         (expression-writing) or cyipopt (GBM) depending on ``cfg.use_gbm``.
+    backend        : str, optional
+        NLP backend for the expression-writing path (``'pounce'`` default,
+        ``'ipopt'`` / ``'cyipopt'``).  Ignored when ``cfg.use_gbm`` is True:
+        the grey-box model requires cyipopt.
     traj_indices   : List[int], optional  (default: all trajectories)
     tee            : bool
         Stream solver output to stdout.
@@ -124,57 +128,32 @@ def solve_simultaneous(
     finally:
         timer.stop('build')
 
-    # ── Helpers: configure and call solver ────────────────────────────────────
-    def _solve_pounce(extra_opts):
-        """ASL-based POUNCE: expression-writing path (no ExternalGreyBoxBlock)."""
-        solver = pyo.SolverFactory('pounce')
-        if pounce_options:
-            for k, v in pounce_options.items():
-                solver.options[k] = v
-        for k, v in extra_opts.items():
-            solver.options[k] = v
-        _log = tmp_log_path()
-        set_output_file(solver, _log)
-        result = solver.solve(m, tee=tee)
-        timing = parse_pounce_log(_log)
-        os.unlink(_log)
-        logger.info(
-            f"  POUNCE: {result.solver.status} / {result.solver.termination_condition}"
-        )
-        return result, timing
-
-    def _solve_cyipopt(extra_opts):
-        """cyipopt: GBM path (required for ExternalGreyBoxBlock)."""
-        solver = pyo.SolverFactory('cyipopt')
-        if pounce_options:
-            for k, v in pounce_options.items():
-                solver.config.options[k] = v
-        for k, v in extra_opts.items():
-            solver.config.options[k] = v
-        _log = tmp_log_path()
-        set_output_file(solver, _log, is_cyipopt=True)
-        result = solver.solve(m, tee=tee)
-        timing = parse_pounce_log(_log)
-        os.unlink(_log)
-        logger.info(
-            f"  cyipopt: {result.solver.status} / {result.solver.termination_condition}"
-        )
-        return result, timing
-
     # ── Solve ──────────────────────────────────────────────────────────────────
     timer.start('solve')
     try:
         if use_gbm:
+            # Grey-box (ExternalGreyBoxBlock) requires cyipopt; backend ignored.
             logger.info("=== Solving simultaneous GBM model (cyipopt, L-BFGS) ===")
-            result, pounce_timing = _solve_cyipopt({'hessian_approximation': 'limited-memory'})
+            solver = make_nlp_solver('cyipopt', pounce_options)
+            res = solver.solve(
+                m, tee=tee,
+                extra_options={'hessian_approximation': 'limited-memory'},
+            )
         else:
-            logger.info("=== Solving simultaneous model (POUNCE, expr-writing) ===")
-            result, pounce_timing = _solve_pounce({})
+            solver = make_nlp_solver(backend or 'pounce', pounce_options)
+            logger.info(
+                f"=== Solving simultaneous model ({solver.name}, expr-writing) ==="
+            )
+            res = solver.solve(m, tee=tee)
+        logger.info(
+            f"  {solver.name}: {res.result.solver.status} "
+            f"/ {res.result.solver.termination_condition}"
+        )
     finally:
         timer.stop('solve')
 
-    m._solver_result = result
-    m._pounce_timing = pounce_timing
+    m._solver_result = res.result
+    m._pounce_timing = res.timing
 
     # ── Extract trained MLP ────────────────────────────────────────────────────
     trained_mlp = extract_mlp(m)

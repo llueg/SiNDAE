@@ -19,6 +19,7 @@ CHANGES.md
 CLAUDE.md
 CONTEXT.md
 dev/
+.ruff_cache/
 
 # MyST build outputs
 _build

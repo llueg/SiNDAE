@@ -3,6 +3,7 @@ version: 1
 project:
   id: c3c4e470-ddee-4bae-8263-9b574a83ca09
   title: SiNDAE
+  logo: docs/images/SiNDAE_logo.png
   description: A Python package for identifying unknown nonlinear terms in ODE/DAE systems using a simultaneous NLP approach.
   keywords: ["scientific machine learning", "neural ODE", "DAE", "implicit differentiation", "UDE"]
   authors:
@@ -46,6 +47,7 @@ project:
         - file: docs/api/simultaneous.md
         - file: docs/api/decomp.md
         - file: docs/api/inference.md
+        - file: docs/api/solvers.md
     - title: Examples
       children:
         - file: docs/examples_gallery/index.md
@@ -58,6 +60,10 @@ project:
 
 site:
   template: book-theme
+  logo: docs/images/SiNDAE_logo.png
+  logo_dark: docs/images/SiNDAE_logo_dark.png
+  parts:
+    primary_sidebar_footer: docs/blank_footer.md
 
 # NOTE: This project builds with Jupyter Book v2 / mystmd (the JavaScript MyST
 # engine), which does not run Sphinx. A `sphinx:` config block here is ignored

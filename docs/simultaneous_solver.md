@@ -42,7 +42,8 @@ $\alpha_r$ (the `reg_coef` argument). The network constraint is embedded symboli
 NN computations are written as explicit Pyomo expressions. This exposes the exact second-order
 structure to IPOPT, enabling the full Hessian and typically faster convergence.
 
-Solver: `SolverFactory('pounce')`.
+Solver: POUNCE by default. Pass `backend='ipopt'` (or `backend='cyipopt'`) to
+`solve_simultaneous` to use an alternative ASL backend (see [](api/solvers.md)).
 
 ### Grey-box model (`use_gbm=True`)
 

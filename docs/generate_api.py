@@ -75,6 +75,12 @@ MANIFEST: dict[str, list[str]] = {
         "algorithms.inference.make_inference_model",
         "algorithms.inference.solve_inference",
     ],
+    "solvers": [
+        "solvers.make_nlp_solver",
+        "solvers.make_linear_solver",
+        "solvers.NLPSolver",
+        "solvers.NLPResult",
+    ],
 }
 
 # Public methods worth documenting on a class even though they are "ordinary"

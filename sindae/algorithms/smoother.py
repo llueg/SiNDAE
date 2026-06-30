@@ -19,7 +19,6 @@ API
 from __future__ import annotations
 
 import logging
-import os
 from typing import List, Optional
 
 import pyomo.environ as pyo
@@ -28,7 +27,7 @@ from pyomo.common.timing import HierarchicalTimer
 
 from sindae.nn_utils import SimpleMLP
 from sindae.problem import ProblemDefinition
-from sindae.algorithms.timing_utils import tmp_log_path, parse_pounce_log, set_output_file
+from sindae.solvers import make_nlp_solver
 from sindae.algorithms.model_builder_utils import (
     Z_SMOOTH_NAME,
     Z_SMOOTH_DERIV_NAME,
@@ -145,6 +144,7 @@ def solve_smoother(
     traj_indices: Optional[List[int]] = None,
     smooth_coef: float = 1.0,
     pounce_options: Optional[dict] = None,
+    backend: str = 'pounce',
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
 ) -> pyo.ConcreteModel:
@@ -158,6 +158,8 @@ def solve_smoother(
     traj_indices   : List[int], optional  (default: all trajectories)
     smooth_coef    : float
     pounce_options : dict, optional  (e.g. ``{'tol': 1e-6, 'max_iter': 500}``)
+    backend        : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
+        NLP solver backend.
 
     Returns
     -------
@@ -181,21 +183,15 @@ def solve_smoother(
                              )
     timer.stop('build')
 
-    solver = pyo.SolverFactory('pounce')
-    if pounce_options:
-        for k, v in pounce_options.items():
-            solver.options[k] = v
-    _log = tmp_log_path()
-    set_output_file(solver, _log)
+    solver = make_nlp_solver(backend, pounce_options)
 
     timer.start('solve')
-    result = solver.solve(m, tee=False)
+    res = solver.solve(m, tee=False)
     timer.stop('solve')
 
-    m._solver_result = result
-    m._pounce_timing = parse_pounce_log(_log)
-    os.unlink(_log)
+    m._solver_result = res.result
+    m._pounce_timing = res.timing
     logger.info(
-        f"  Smoother: {result.solver.status} / {result.solver.termination_condition}"
+        f"  Smoother: {res.result.solver.status} / {res.result.solver.termination_condition}"
     )
     return m

@@ -31,7 +31,7 @@ Hyperparameters for the decomposition (Adam + KKT gradient) training loop.
 ### `train_decomp`
 
 ```python
-train_decomp(problem: ProblemDefinition, mlp: SimpleMLP, cfg: DecompConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, mpi_comm = None, cyipopt_options: Optional[dict] = None) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]
+train_decomp(problem: ProblemDefinition, mlp: SimpleMLP, cfg: DecompConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, mpi_comm = None, cyipopt_options: Optional[dict] = None, linear_solver: str = 'feral') -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]
 ```
 
 Train a neural network via the decomposition (GBM + KKT gradient) approach.
@@ -48,6 +48,7 @@ Pretraining is NOT handled here — call ``pretrain_mlp`` from
 - **`smoother_model`** (`Optional[pyo.ConcreteModel]`, default `None`) — When provided, reused as the decomp NLP base (no rebuild / re-discretisation); IPOPT warm-starts from the smoother solution.
 - **`mpi_comm`** (default `None`)
 - **`cyipopt_options`** (`Optional[dict]`, default `None`) — Options passed to cyipopt, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
+- **`linear_solver`** (`str`, default `'feral'`) — KKT/linear solver for the decomposition gradient back-solve.
 
 **Returns**
 

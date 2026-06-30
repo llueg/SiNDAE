@@ -1,7 +1,7 @@
 # SiNDAE
 
-**SiNDAE** (*Simultaneous Neural Differential-Algebraic Equation learning*) is a Python package
-for identifying unknown nonlinear terms in ODE/DAE systems from noisy time-series observations.
+**SiNDAE** (*Simultaneous Neural Differential-Algebraic Equation*) is a Python package
+for learning unknown nonlinear terms in ODE/DAE systems from noisy time-series observations.
 
 Rather than training a neural network in isolation and plugging it into a simulator afterward,
 SiNDAE embeds the network directly inside the physics-based model and trains it by solving a

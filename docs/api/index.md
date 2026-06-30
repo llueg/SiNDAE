@@ -29,6 +29,7 @@ sindae.train_decomp          # via sindae.algorithms.decomp.train
 | [simultaneous](simultaneous.md) | `SimultaneousConfig`, `build_simultaneous_model`, `solve_simultaneous`, `extract_mlp` |
 | [decomp](decomp.md) | `DecompConfig`, `train_decomp`, `build_decomp_model` |
 | [inference](inference.md) | `make_inference_model`, `solve_inference` |
+| [solvers](solvers.md) | `make_nlp_solver`, `make_linear_solver`, `NLPSolver`, `NLPResult` |
 
 The full end-to-end workflow — problem → smoother → pre-training → training → inference —
 is shown in the [examples gallery](../examples_gallery/index.md).

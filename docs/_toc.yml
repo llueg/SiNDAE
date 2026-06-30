@@ -20,6 +20,7 @@ chapters:
       - file: api/simultaneous
       - file: api/decomp
       - file: api/inference
+      - file: api/solvers
   - caption: Examples
     chapters:
       - file: examples_gallery/index

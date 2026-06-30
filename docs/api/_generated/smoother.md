@@ -35,7 +35,7 @@ before ``problem.norm_stats`` is set.
 ### `solve_smoother`
 
 ```python
-solve_smoother(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: Optional[List[int]] = None, smooth_coef: float = 1.0, pounce_options: Optional[dict] = None, timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> pyo.ConcreteModel
+solve_smoother(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: Optional[List[int]] = None, smooth_coef: float = 1.0, pounce_options: Optional[dict] = None, backend: str = 'pounce', timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> pyo.ConcreteModel
 ```
 
 Build and solve the smoother NLP, returning the solved model.
@@ -47,6 +47,7 @@ Build and solve the smoother NLP, returning the solved model.
 - **`traj_indices`** (`Optional[List[int]]`, default `None`)
 - **`smooth_coef`** (`float`, default `1.0`)
 - **`pounce_options`** (`Optional[dict]`, default `None`)
+- **`backend`** (`str`, default `'pounce'`) — NLP solver backend.
 - **`timer`** (`Optional[HierarchicalTimer]`, default `None`)
 - **`unfix_io`** (`bool`, default `True`)
 
