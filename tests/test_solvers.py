@@ -55,7 +55,8 @@ def test_solver_capability_flags():
     assert make_nlp_solver("ipopt").is_cyipopt is False
     assert make_nlp_solver("cyipopt").is_cyipopt is True
 
-    assert make_nlp_solver("pounce").supports_return_nlp is False
+    # POUNCE returns the NLP for grey-box models (its cyipopt-style path).
+    assert make_nlp_solver("pounce").supports_return_nlp is True
     assert make_nlp_solver("cyipopt").supports_return_nlp is True
 
 

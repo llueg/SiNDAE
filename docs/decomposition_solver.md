@@ -3,8 +3,9 @@
 The decomposition approach is a **bi-level** scheme that decouples the network-parameter update
 from the DAE solve. It alternates between:
 
-1. **Inner step:** fix $\boldsymbol{\theta}$ and solve the per-scenario DAE NLP via cyipopt with a
-   Grey-Box Model (GBM) of the network.
+1. **Inner step:** fix $\boldsymbol{\theta}$ and solve the per-scenario DAE NLP with a
+   Grey-Box Model (GBM) of the network, by default through POUNCE's grey-box
+   interface (`backend='cyipopt'` selects cyipopt instead).
 2. **Outer step:** compute $\nabla_{\boldsymbol{\theta}} \Phi$ by **implicit differentiation of the
    inner KKT conditions** and take an Adam step on $\boldsymbol{\theta}$.
 
@@ -53,6 +54,10 @@ network terms enter through vector-Jacobian products evaluated by automatic diff
 FERAL is the default; pass `linear_solver='ma27'` or `linear_solver='scipy'` to `train_decomp`
 to select an alternative (see [](api/solvers.md)).
 
+The inner NLP is solved with POUNCE by default (`backend='pounce'`; `'cyipopt'` or `'ipopt'`
+are selectable). For POUNCE the decomposition defaults `mu_strategy='adaptive'`, which
+converges robustly on the cold inner solves; pass your own `solver_options` to override it.
+
 ---
 
 ## Usage
@@ -81,7 +86,7 @@ trained_m, mlp, history = train_decomp(
     cfg=cfg,
     data=smoother_data,           # normalization statistics
     smoother_model=smoother_m,    # warm-start the inner NLP
-    cyipopt_options={'tol': 1e-6, 'max_iter': 300},
+    solver_options={'tol': 1e-6, 'max_iter': 300},
 )
 
 # trained_m is the solved NLP; recover trajectories with:
@@ -104,7 +109,7 @@ trained_data = extract_instance_data(problem, trained_m)
 | `slack_scale` | 2.0 | Multiplicative slack schedule factor |
 | `slack_update_interval` | `inf` | Steps between slack schedule updates |
 | `max_slack_coef` | 1000 | Cap on slack penalty |
-| `mu_target` | 1e-10 | cyipopt barrier parameter target |
+| `mu_target` | 1e-10 | Inner NLP barrier parameter target |
 | `param_reg_coef` | 0.0 | L2 regularization on NN parameters |
 | `patience` | 0 | Early stopping patience (0 = disabled) |
 | `slack_tol` | 1e-6 | Feasibility threshold for early stopping |

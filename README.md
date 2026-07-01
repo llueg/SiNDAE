@@ -1,3 +1,5 @@
+![SiNDAE](docs/images/SiNDAE_logo_dark.png)
+
 # SiNDAE — A Simultaneous Approach for Training Neural Differential-Algebraic Equations
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -38,15 +40,17 @@ equations*](https://arxiv.org/abs/2504.04665) (Lueg et al., 2025).
 > **Coming soon to PyPI.** Until then, use the development install from source below.
 
 ```bash
-pip install sindae            # core: the simultaneous (POUNCE) workflow
-pip install "sindae[full]"    # adds cyipopt and mpi4py for decomposition, GBM, inference, MPI
+pip install sindae            # core: full POUNCE/FERAL workflow (simultaneous, decomposition, inference)
+pip install "sindae[full]"    # adds mpi4py (MPI) and cyipopt (optional alternative NLP backend)
 ```
 
-The core install is pure pip wheels with no system libraries or licenses. The `full`
-extra adds `cyipopt` and `mpi4py`, whose wheels are platform-dependent; if they do
-not build, install those two from conda-forge and `pip install sindae` into the same
-environment. See [`docs/installation.md`](docs/installation.md) for the conda route,
-GPU/Apple Silicon, and troubleshooting.
+The core install is pure pip wheels with no system libraries or licenses, and runs the
+entire pipeline (simultaneous, decomposition, grey-box, inference) on POUNCE and FERAL.
+The `full` extra adds `mpi4py` (for MPI-parallel decomposition) and `cyipopt` (an optional
+alternative NLP backend), whose wheels are platform-dependent; if they do not build, install
+them from conda-forge and `pip install sindae` into the same environment. See
+[`docs/installation.md`](docs/installation.md) for the conda route, GPU/Apple Silicon, and
+troubleshooting.
 
 For a development install from source:
 
@@ -103,7 +107,7 @@ then train the hybrid model with one of the two backends.
 
 | Backend | Entry point | Idea |
 |---------|-------------|------|
-| Simultaneous | `solve_simultaneous` | Network weights, states, and algebraic variables are decision variables in a single NLP solved by POUNCE (exact Hessian) or cyipopt (L-BFGS). |
+| Simultaneous | `solve_simultaneous` | Network weights, states, and algebraic variables are decision variables in a single NLP solved by POUNCE (exact Hessian, or L-BFGS for the grey-box variant). |
 | Decomposition | `train_decomp` | An outer Adam loop updates the weights; each step solves the DAE and obtains gradients by implicit differentiation of the KKT conditions. Supports MPI across trajectories. |
 
 Both require the network to be twice continuously differentiable, so SiNDAE uses

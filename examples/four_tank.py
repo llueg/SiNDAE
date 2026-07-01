@@ -67,8 +67,8 @@ decomp_cfg = DecompConfig(
     param_reg_coef        = REG_COEF,
     lr_schedule=lr_schedule,
 )
-# cyipopt options for subproblem solutions
-decomp_cyipopt = {}
+# NLP solver options for subproblem solutions
+decomp_solver_opts = {}
 
 simul_cfg = SimultaneousConfig(
     use_gbm  = USE_GBM,
@@ -123,7 +123,7 @@ if METHOD == 'decomp':
     trained_m, mlp, history = train_decomp(
         problem=problem, mlp=mlp, cfg=decomp_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        cyipopt_options=decomp_cyipopt,
+        solver_options=decomp_solver_opts,
     )
 
 elif METHOD == 'simul':

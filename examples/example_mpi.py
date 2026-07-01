@@ -79,7 +79,7 @@ decomp_cfg = DecompConfig(
     param_reg_coef        = REG_COEF,
     subsample_frac        = 1.0,
 )
-decomp_cyipopt = dict(tol=1e-6, max_iter=500, mu_init=1e-4)
+decomp_solver_opts = dict(tol=1e-6, max_iter=500, mu_init=1e-4)
 
 # ── Initial conditions ─────────────────────────────────────────────────────────
 # Cycle through the three default ICs and add uniform noise.
@@ -172,7 +172,7 @@ trained_m, mlp, history = train_decomp(
     data=smoother_data,
     smoother_model=smoother_m,
     mpi_comm=comm,
-    cyipopt_options=decomp_cyipopt,
+    solver_options=decomp_solver_opts,
 )
 
 if is_root:

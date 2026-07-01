@@ -8,8 +8,11 @@ NLP solver (the optimiser that solves each Pyomo model)
     alternatives.  ``make_nlp_solver(backend)`` returns an :class:`NLPSolver`
     that hides the differences between the ASL-based solvers (POUNCE, IPOPT;
     options set on ``solver.options``) and cyipopt (options set on
-    ``solver.config.options``, and the only backend that supports the
-    ``return_nlp=True`` solve used by the decomposition inner loop).
+    ``solver.config.options``).  POUNCE handles grey-box
+    (``ExternalGreyBoxBlock``) models too — including the ``return_nlp=True``
+    solve the decomposition inner loop relies on — via its cyipopt-style Python
+    interface (see :mod:`sindae.interfaces.pounce_interface`); cyipopt remains a
+    selectable alternative for those models, not the default.
 
 Linear / KKT solver (the sparse symmetric solver inside the decomposition
 gradient back-solve)
@@ -81,8 +84,9 @@ class NLPSolver(abc.ABC):
         """The ``SolverFactory`` name for this backend."""
 
     def __init__(self, options: Optional[dict] = None):
+        self._options = dict(options or {})
         self._solver = pyo.SolverFactory(self.name)
-        self._apply_options(options or {})
+        self._apply_options(self._options)
 
     @property
     def pyomo_solver(self):
@@ -141,9 +145,50 @@ class NLPSolver(abc.ABC):
 
 
 class PounceSolver(NLPSolver):
-    """POUNCE (ASL): pip-installable default NLP backend."""
+    """POUNCE: pip-installable default NLP backend.
+
+    Non-grey-box models go through the ASL ``SolverFactory('pounce')`` path
+    (NL/SOL files).  Models carrying an ``ExternalGreyBoxBlock`` are routed
+    through POUNCE's cyipopt-style Python interface
+    (:func:`sindae.interfaces.pounce_interface.solve_pyomo_with_pounce`), which
+    is the only path that can consume grey-box callbacks and is what enables the
+    ``return_nlp=True`` solve used by the decomposition inner loop.
+    """
 
     name = "pounce"
+    supports_return_nlp = True
+
+    @staticmethod
+    def _has_grey_box(model) -> bool:
+        from pyomo.contrib.pynumero.interfaces.external_grey_box import (
+            ExternalGreyBoxBlock,
+        )
+
+        return any(model.component_data_objects(ExternalGreyBoxBlock, active=True))
+
+    def solve(
+        self,
+        model,
+        *,
+        tee: bool = False,
+        extra_options: Optional[dict] = None,
+        return_nlp: bool = False,
+    ) -> NLPResult:
+        if self._has_grey_box(model):
+            from sindae.interfaces.pounce_interface import solve_pyomo_with_pounce
+
+            options = {**self._options, **(extra_options or {})}
+            result, nlp, timing = solve_pyomo_with_pounce(
+                model, options=options, tee=tee, return_nlp=return_nlp
+            )
+            return NLPResult(result=result, timing=timing, nlp=nlp)
+
+        if return_nlp:
+            raise ValueError(
+                "Pounce can only return the NLP for grey-box models "
+                "(ExternalGreyBoxBlock); this model has none"
+            )
+        return super().solve(model, tee=tee, extra_options=extra_options)
 
 
 class IpoptSolver(NLPSolver):

@@ -15,11 +15,13 @@ decomposition gradient.
   method returns.
 
 The stage functions take these selectors directly, so a backend can be chosen without
-touching the package internals. `solve_smoother`, `generate_data`, and the
-expression-writing path of `solve_simultaneous` accept `backend=`; `solve_inference`
-accepts `backend=` (its grey-box model needs cyipopt); `train_decomp` accepts
-`linear_solver=` for the KKT back-solve. `cyipopt` and `ipopt` remain selectable, not
-removed.
+touching the package internals. `solve_smoother`, `generate_data`, `solve_simultaneous`
+(both the expression-writing and grey-box paths), `solve_inference`, and `train_decomp`
+all accept `backend=` (default `pounce`); `solve_inference` and `train_decomp` also take
+`solver_options=`, and `train_decomp` takes `linear_solver=` for the KKT back-solve.
+POUNCE solves the grey-box (`ExternalGreyBoxBlock`) models too, through its cyipopt-style
+interface, so cyipopt is no longer required for the decomposition, inference, or grey-box
+simultaneous solves. `cyipopt` and `ipopt` remain selectable, not removed.
 
 ## Usage
 

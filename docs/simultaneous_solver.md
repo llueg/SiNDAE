@@ -51,7 +51,8 @@ The NN forward pass is wrapped in a `NNSimulGreyBoxModel` (a `PyNumero`
 `ExternalGreyBoxModel`). Only Jacobian-vector products are provided and the Hessian is
 approximated via **L-BFGS**. Slower per iteration but scales better to large networks.
 
-Solver: `SolverFactory('cyipopt')`.
+Solver: POUNCE by default, through its grey-box (cyipopt-style) interface; pass
+`backend='cyipopt'` to use cyipopt instead. L-BFGS is selected automatically.
 
 ---
 
@@ -105,7 +106,8 @@ Common options for the expression-writing path:
 | `max_iter` | `1000` | Maximum IPOPT iterations |
 | `hessian_approximation` | `exact` (default) | Use `limited-memory` for large networks |
 
-For the GBM path, also set `hessian_approximation: limited-memory` (required).
+The GBM path always uses L-BFGS; `solve_simultaneous` sets
+`hessian_approximation: limited-memory` for you (POUNCE also forces it internally).
 
 ---
 

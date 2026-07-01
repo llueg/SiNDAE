@@ -31,8 +31,9 @@ This pulls the core stack (`numpy`, `scipy`, `jax`, `equinox`, `optax`, `pyomo`,
 `matplotlib`) together with the pure-Rust solvers
 [POUNCE](https://github.com/jkitchin/pounce) and
 [FERAL](https://github.com/jkitchin/feral), which install from wheels with no
-system libraries and no license. The core install is enough to run the full
-**simultaneous** training workflow (problem, smoother, training, and plotting).
+system libraries and no license. The core install runs the entire SiNDAE pipeline
+(problem, smoother, **simultaneous** and **decomposition** training, grey-box models,
+inference, and plotting) on POUNCE and FERAL.
 
 ### Full install
 
@@ -40,10 +41,10 @@ system libraries and no license. The core install is enough to run the full
 pip install "sindae[full]"
 ```
 
-The `full` extra adds `cyipopt` and `mpi4py`, which are required for the
-**decomposition** approach, the grey-box simultaneous variant, inference, and MPI
-parallelism. Their wheels depend on your platform; if either fails to build from
-pip, use the conda route below for those two packages.
+The `full` extra adds `mpi4py`, required for **MPI-parallel** decomposition training,
+and `cyipopt`, an optional alternative NLP backend (POUNCE is the default for every
+solve). Their wheels depend on your platform; if either fails to build from pip, use
+the conda route below for those two packages.
 
 ## Install with conda (alternative)
 
@@ -69,7 +70,7 @@ pip install sindae
 | `pyomo` | core | Symbolic DAE model building and collocation |
 | `pounce-solver` | core | IPOPT-compatible NLP solver (pure-Rust wheels, no HSL) |
 | `feral-solver` | core | Sparse symmetric KKT solver for the decomposition gradient |
-| `cyipopt` | `[full]` | IPOPT with MUMPS, used by decomposition, GBM, and inference |
+| `cyipopt` | `[full]` | Optional alternative NLP backend (IPOPT with MUMPS); POUNCE is the default |
 | `mpi4py` | `[full]` | MPI parallelism for multi-trajectory decomposition training |
 
 ## GPU and accelerator support (optional)
@@ -120,7 +121,7 @@ print("JAX devices:", jax.devices())
 # POUNCE backs the simultaneous workflow (core install).
 print("POUNCE available:", pyo.SolverFactory("pounce").available())
 
-# cyipopt is optional (full install); only needed for decomposition / inference.
+# cyipopt is optional: a selectable alternative NLP backend, not required for any feature.
 try:
     print("cyipopt available:", pyo.SolverFactory("cyipopt").available())
 except Exception as exc:

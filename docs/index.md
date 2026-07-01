@@ -16,8 +16,8 @@ SiNDAE is the companion code to {cite}`lueg2025simultaneous`.
 
 | Algorithm | Description |
 |-----------|-------------|
-| **Simultaneous** | NN weights and DAE states are all decision variables in one large NLP. Solved with POUNCE (exact Hessian) or cyipopt (L-BFGS). |
-| **Decomposition** | Outer Adam loop updates NN weights; inner NLP (cyipopt + GBM) solves the DAE at each step. Gradients via KKT implicit differentiation. Supports MPI. |
+| **Simultaneous** | NN weights and DAE states are all decision variables in one large NLP. Solved with POUNCE (exact Hessian, or L-BFGS for the grey-box variant). |
+| **Decomposition** | Outer Adam loop updates NN weights; inner NLP (POUNCE + GBM) solves the DAE at each step. Gradients via KKT implicit differentiation. Supports MPI. |
 
 Both algorithms use [Pyomo DAE](https://pyomo.readthedocs.io/) for symbolic model building and
 Lagrange–Radau collocation for time discretization.

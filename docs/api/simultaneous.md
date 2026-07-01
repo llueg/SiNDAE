@@ -10,7 +10,7 @@ outer training loop. Two backends are available, selected by
 | `use_gbm` | Backend | Solver | Hessian |
 |-----------|---------|--------|---------|
 | `False` (default) | expression-writing | POUNCE | exact |
-| `True` | grey-box (GBM) | cyipopt | L-BFGS (limited-memory) |
+| `True` | grey-box (GBM) | POUNCE | L-BFGS (limited-memory) |
 
 The expression-writing backend rewrites the `SimpleMLP` as explicit Pyomo expressions and
 gets an exact Hessian; the grey-box backend treats the network as a black box (function +

@@ -2,10 +2,10 @@
 
 `sindae.algorithms.decomp`
 
-The decomposition approach alternates between an inner cyipopt NLP solve (with the network
-embedded as a Grey-Box Model) and an outer Adam update whose gradient comes from KKT
-implicit differentiation of the inner solution. It supports MPI parallelism across
-trajectories.
+The decomposition approach alternates between an inner NLP solve (with the network
+embedded as a Grey-Box Model, solved by POUNCE by default) and an outer Adam update whose
+gradient comes from KKT implicit differentiation of the inner solution. It supports MPI
+parallelism across trajectories.
 
 - [`DecompConfig`](#sindae.algorithms.decomp.train.DecompConfig) — the Adam / KKT / slack
   hyperparameters.
@@ -26,7 +26,7 @@ trained_m, mlp, history = train_decomp(
     problem, mlp, cfg,
     data=smoother_data,              # normalization statistics
     smoother_model=smoother_m,       # reuse the discretized smoother
-    cyipopt_options={'tol': 1e-6, 'max_iter': 300},
+    solver_options={'tol': 1e-6, 'max_iter': 300},   # backend='pounce' by default
 )
 trained_data = extract_instance_data(problem, trained_m)
 # history['data_fit_history'], history['grad_norm_history'], ... for diagnostics

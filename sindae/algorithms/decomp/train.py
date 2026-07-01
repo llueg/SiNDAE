@@ -113,7 +113,8 @@ def train_decomp(
     data: InstanceData,
     smoother_model: Optional[pyo.ConcreteModel] = None,
     mpi_comm=None,
-    cyipopt_options: Optional[dict] = None,
+    solver_options: Optional[dict] = None,
+    backend: str = 'pounce',
     linear_solver: str = 'feral',
 ) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
     """
@@ -134,8 +135,10 @@ def train_decomp(
         When provided, reused as the decomp NLP base (no rebuild /
         re-discretisation); IPOPT warm-starts from the smoother solution.
     mpi_comm        : mpi4py.MPI.Comm, optional
-    cyipopt_options : dict, optional
-        Options passed to cyipopt, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
+    solver_options  : dict, optional
+        Options passed to the NLP backend, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
+    backend         : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``)
+        NLP solver for the inner grey-box solve.  Must be grey-box-capable.
     linear_solver   : str  (default ``'feral'``; ``'ma27'`` / ``'scipy'``)
         KKT/linear solver for the decomposition gradient back-solve.
 
@@ -209,7 +212,8 @@ def train_decomp(
         mu_target=cfg.mu_target,
         slack_coef=cfg.init_slack_coef,
         subsample_frac=cfg.subsample_frac,
-        cyipopt_options=cyipopt_options,
+        solver_options=solver_options,
+        backend=backend,
         linear_solver=linear_solver,
     )
 

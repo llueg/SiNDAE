@@ -9,10 +9,11 @@ parameters jointly in a single solve — no outer training loop required.
 
 Two sub-approaches are supported (controlled by ``SimultaneousConfig.use_gbm``):
   False (default) : expression-writing — NNBlock, exact Hessian available
-                    → solved with ``SolverFactory('pounce')`` (ASL interface)
+                    → solved with POUNCE on the ASL interface
   True            : grey-box (NNSimulGreyBoxModel) — requires L-BFGS
-                    → solved with ``SolverFactory('cyipopt')`` (needed for
-                       ExternalGreyBoxBlock; standard IPOPT cannot handle it)
+                    → solved with POUNCE's cyipopt-style grey-box interface
+                       (ExternalGreyBoxBlock; cyipopt selectable). Standard
+                       ASL/IPOPT cannot consume grey-box callbacks.
 """
 from __future__ import annotations
 
@@ -77,9 +78,9 @@ def solve_simultaneous(
         'hessian_approximation': 'limited-memory'}``.  Passed to POUNCE
         (expression-writing) or cyipopt (GBM) depending on ``cfg.use_gbm``.
     backend        : str, optional
-        NLP backend for the expression-writing path (``'pounce'`` default,
-        ``'ipopt'`` / ``'cyipopt'``).  Ignored when ``cfg.use_gbm`` is True:
-        the grey-box model requires cyipopt.
+        NLP backend (``'pounce'`` default, ``'ipopt'`` / ``'cyipopt'``).
+        Applies to both paths.  When ``cfg.use_gbm`` is True the backend must be
+        grey-box-capable (POUNCE / cyipopt); ``'ipopt'`` is rejected there.
     traj_indices   : List[int], optional  (default: all trajectories)
     tee            : bool
         Stream solver output to stdout.
@@ -132,9 +133,14 @@ def solve_simultaneous(
     timer.start('solve')
     try:
         if use_gbm:
-            # Grey-box (ExternalGreyBoxBlock) requires cyipopt; backend ignored.
-            logger.info("=== Solving simultaneous GBM model (cyipopt, L-BFGS) ===")
-            solver = make_nlp_solver('cyipopt', pounce_options)
+            # Grey-box (ExternalGreyBoxBlock) needs a grey-box-capable backend
+            # (POUNCE default; cyipopt selectable) and L-BFGS — the GBM supplies
+            # no Hessian.  POUNCE forces limited-memory itself; cyipopt needs it
+            # passed in, so set it for both.
+            solver = make_nlp_solver(backend or 'pounce', pounce_options)
+            logger.info(
+                f"=== Solving simultaneous GBM model ({solver.name}, L-BFGS) ==="
+            )
             res = solver.solve(
                 m, tee=tee,
                 extra_options={'hessian_approximation': 'limited-memory'},
