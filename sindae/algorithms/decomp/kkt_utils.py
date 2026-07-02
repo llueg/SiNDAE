@@ -255,6 +255,15 @@ def v_eval_del_obj_del_param(interface, linear_solver, param,
     _s('del_obj_del_rho')
 
     _t('numeric_fact')
+    # The KKT sparsity pattern is not invariant across training steps: the
+    # Hessian-of-Lagrangian and the bound-barrier diagonal gain and lose
+    # structural nonzeros as the iterate moves.  Refresh the symbolic
+    # factorization on the current matrix before every numeric factorization;
+    # otherwise MA27 reuses a stale analyse ordering and falsely reports the
+    # (genuinely nonsingular) matrix as singular ("return code: 3").  FERAL and
+    # scipy re-derive their symbolic step inside each numeric call, so this is a
+    # no-op for them.
+    linear_solver.do_symbolic_factorization(kkt)
     linear_solver.do_numeric_factorization(kkt)
     _s('numeric_fact')
 

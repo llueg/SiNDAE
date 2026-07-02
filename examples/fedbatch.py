@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-METHOD   = 'simul'   # 'decomp' | 'simul'
+METHOD   = 'decomp'   # 'decomp' | 'simul'
 # simul options
 USE_GBM  = True   # whether to use GBM in simultaneous training
 HESS_APPROX = 'limited-memory'
@@ -119,6 +119,7 @@ if METHOD == 'decomp':
         problem=problem, mlp=mlp, cfg=decomp_cfg,
         data=smoother_data, smoother_model=smoother_m,
         solver_options=decomp_solver_opts,
+        linear_solver="ma27"
     )
 
 elif METHOD == 'simul':

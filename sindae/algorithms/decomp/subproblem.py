@@ -74,6 +74,10 @@ class TrajectoryBatchSubproblem:
     slack_coef : float
     param_reg_coef : float
     subsample_frac : float
+    backend : str or NLPSolver
+        NLP solver for the inner grey-box solve ('pounce' default; 'cyipopt' /
+        'ipopt' select alternatives).  The KKT gradient needs the populated NLP,
+        so the backend must be grey-box-capable (POUNCE / cyipopt).
     linear_solver : str or IPLinearSolverInterface
         KKT/linear solver for the gradient back-solve ('feral' default, 'ma27',
         'scipy', or a pre-built interface).
@@ -90,7 +94,8 @@ class TrajectoryBatchSubproblem:
         mu_target=1e-10,
         slack_coef=1.0,
         subsample_frac=1.0,
-        cyipopt_options=None,
+        solver_options=None,
+        backend='pounce',
         linear_solver='feral',
     ):
         self._model         = model
@@ -106,9 +111,15 @@ class TrajectoryBatchSubproblem:
         # Precompile gradient; obj_fun_jax first arg is norm_obs
         self._grad_obj_jit = jax.jit(jax.grad(obj_fun_jax, argnums=(0, 1, 2)))
 
-        self._nlp_solver    = make_nlp_solver('cyipopt', cyipopt_options)
+        # POUNCE's default (monotone) mu strategy stalls on the cold index-2
+        # DAE inner NLP; the adaptive strategy converges robustly and matches
+        # the cyipopt reference.  Default it in for POUNCE only (cyipopt/ipopt
+        # keep their defaults); a user-supplied mu_strategy always wins.
+        opts = dict(solver_options or {})
+        if isinstance(backend, str) and backend.lower() == 'pounce':
+            opts.setdefault('mu_strategy', 'adaptive')
+        self._nlp_solver    = make_nlp_solver(backend, opts)
         self._linear_solver = make_linear_solver(linear_solver)
-        self._symbolic_done = False
 
         self._extended_nlp = None
         self._interface    = None
@@ -163,7 +174,7 @@ class TrajectoryBatchSubproblem:
             self._model.slack_coef.set_value(slack_coef)
         _s('update_mlp')
 
-        # 2. Solve with cyipopt; return_nlp=True gives us the populated NLP
+        # 2. Solve the inner NLP; return_nlp=True gives us the populated NLP
         _t('solve')
         _res = self._nlp_solver.solve(self._model, return_nlp=True)
         solved_nlp = _res.nlp
@@ -268,7 +279,10 @@ class TrajectoryBatchSubproblem:
 
         First call: builds PyomoNLPWithGreyBoxBlocksExtended (computes sparsity).
         Subsequent calls: swap inner NLP only (reuse sparsity maps).
-        Symbolic factorization of the KKT linear solver done exactly once.
+
+        Symbolic factorization of the KKT linear solver is refreshed on each
+        gradient evaluation inside ``v_eval_del_obj_del_param`` (the KKT sparsity
+        pattern is not invariant across steps), so it is not done here.
         """
         def _t(name): return timer.start(name) if timer else None
         def _s(name): return timer.stop(name)  if timer else None
@@ -288,12 +302,6 @@ class TrajectoryBatchSubproblem:
 
         if self._norm_input_idx is None:
             self._compute_indices()
-
-        if not self._symbolic_done:
-            _t('symbolic_fact')
-            dutils.init_linear_solver(self._linear_solver, self._interface)
-            _s('symbolic_fact')
-            self._symbolic_done = True
 
         _s('update_nlp')
 
