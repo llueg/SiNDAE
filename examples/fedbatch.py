@@ -118,8 +118,7 @@ if METHOD == 'decomp':
     trained_m, mlp, history = train_decomp(
         problem=problem, mlp=mlp, cfg=decomp_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        solver_options=decomp_solver_opts,
-        linear_solver="ma27"
+        solver_options=decomp_solver_opts
     )
 
 elif METHOD == 'simul':
