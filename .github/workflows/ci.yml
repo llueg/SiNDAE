@@ -57,6 +57,18 @@ jobs:
         shell: bash -el {0}
         run: pip install pytest
 
+      # PyNumero's grey-box / return_nlp path (POUNCE-GBM, the decomp inner solve,
+      # and the cyipopt oracle) builds an in-memory PyomoNLP, which needs the
+      # compiled pynumero_ASL extension. Neither the conda nor the pip pyomo ships
+      # it, so build it into ~/.pyomo/lib (needs a C/C++ toolchain + cmake).
+      - name: Build PyNumero ASL extension
+        shell: bash -el {0}
+        run: |
+          micromamba install -y -n sindae -c conda-forge cmake make c-compiler cxx-compiler
+          pyomo download-extensions
+          pyomo build-extensions
+          python -c "from pyomo.contrib.pynumero.asl import AmplInterface; assert AmplInterface.available(), 'pynumero_ASL not available after build-extensions'; print('pynumero_ASL OK')"
+
       # Run only the fast suite.
       - name: Run fast tests
         shell: bash -el {0}

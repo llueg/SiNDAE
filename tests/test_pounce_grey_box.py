@@ -32,6 +32,18 @@ jax.config.update("jax_enable_x64", True)
 pytest.importorskip("pounce")
 pytest.importorskip("cyipopt")
 
+# Grey-box / return_nlp solves build an in-memory PyomoNLP, which needs the
+# compiled pynumero_ASL extension (`pyomo build-extensions`).  Skip cleanly on a
+# pip-only machine that lacks it rather than erroring deep in PyomoNLP.__init__.
+from pyomo.contrib.pynumero.asl import AmplInterface
+
+if not AmplInterface.available():
+    pytest.skip(
+        "pynumero_ASL not available; grey-box NLPs require the compiled ASL "
+        "interface (run `pyomo build-extensions`)",
+        allow_module_level=True,
+    )
+
 from sindae.nn_utils import SimpleMLP
 from sindae.algorithms.decomp.nn_gbm import NNGreyBoxModel, _eval_all, _jac_all
 from sindae.solvers import make_nlp_solver
