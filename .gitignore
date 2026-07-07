@@ -12,7 +12,6 @@ plots/
 *.log
 .vscode/
 .idea/
-tests/migration_tests
 .claude/
 .pytest_cache/
 CHANGES.md
