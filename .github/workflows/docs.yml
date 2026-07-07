@@ -1,0 +1,64 @@
+# Build the documentation site (Jupyter Book v2 / mystmd) and deploy it to
+# GitHub Pages. Runs on every push to main so the published docs always match
+# main; can also be triggered manually from the Actions tab.
+name: Publish Documentation
+
+on:
+  push:
+    branches: [main]
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+# Least-privilege scopes the Pages deployment needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serialize Pages deployments; let an in-flight deploy finish rather than
+# cancelling it, so the live site is never left half-updated.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Light install: docs/generate_api.py loads sindae statically with griffe
+      - name: Install docs dependencies
+        run: pip install -r docs/requirements.txt
+
+      # Keep the API reference in sync with the current docstrings.
+      - name: Regenerate API reference
+        run: python docs/generate_api.py
+
+      # Provides `base_path` (= "/SiNDAE" for a project page, "" for a custom
+      # domain) so the site is built with correct asset/link prefixes.
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build the site
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_path }}
+        run: jupyter book build --html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _build/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
