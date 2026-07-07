@@ -213,9 +213,11 @@ def test_back_solve_consistency():
 
     solvers = [('scipy', ScipyInterface)]
     
-    solvers.append(('ma27', InteriorPointMA27Interface))
+    if MA27_AVAILABLE:
+        solvers.append(('ma27', InteriorPointMA27Interface))
     
-    solvers.append(('feral', FeralInterface))
+    if FERAL_AVAILABLE:
+        solvers.append(('feral', FeralInterface))
 
     solutions = {}
     for name, cls in solvers:
