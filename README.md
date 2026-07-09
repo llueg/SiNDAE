@@ -91,7 +91,7 @@ new_problem = sd.LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=40, ncp=3)
 pred = model.predict(new_problem, slack_coef=1e-5)   # inference on new conditions
 ```
 
-The stage functions behind the wrapper remain available for full control:
+The stage functions behind the wrapper remain available for additional control:
 
 ```python
 import jax
@@ -145,7 +145,7 @@ smooth activations (`tanh`, `softplus`, `swish`). See
 
 ## Documentation
 
-The full documentation is a [Jupyter Book](https://jupyterbook.org/) (mystmd engine).
+The full documentation is a [Jupyter Book](https://jupyterbook.org/) .
 
 [INSERT PUBLISHED DOCS WEBSITE HERE]
 
