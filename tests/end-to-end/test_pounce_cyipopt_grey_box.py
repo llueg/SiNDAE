@@ -5,7 +5,7 @@ simultaneous-GBM solve.
 
 cyipopt is the ground-truth oracle.  Each site runs the full SiNDAE pipeline
 (data -> smoother -> pretrain -> solve) once with the migrated POUNCE default
-and once with backend='cyipopt', and the two are required to agree:
+and once with nlp_solver='cyipopt', and the two are required to agree:
 
   * decomp     : the per-step objective history (the inner solve drives the KKT
                  gradient, so an agreeing history means the populated NLP and its
@@ -79,7 +79,7 @@ def test_decomp_pounce_matches_cyipopt():
         cfg = DecompConfig(n_steps=8, lr=1e-2, init_slack_coef=1e2)
         _, _, hist = train_decomp(
             problem, mlp, cfg, data=sdata, smoother_model=fresh_smoother(),
-            backend=backend, solver_options={"tol": 1e-7, "max_iter": 300})
+            nlp_solver=backend, solver_options={"tol": 1e-7, "max_iter": 300})
         return np.array(hist["obj_history"])
 
     obj_cy = run("cyipopt")
@@ -94,7 +94,7 @@ def test_inference_pounce_matches_cyipopt():
     problem, mlp0, mlp, sdata, _ = _pipeline_inputs()
 
     def infer(backend):
-        m = solve_inference(problem, mlp, sdata, slack_coef=1e-5, backend=backend,
+        m = solve_inference(problem, mlp, sdata, slack_coef=1e-5, nlp_solver=backend,
                             solver_options={"tol": 1e-8, "max_iter": 500})
         assert str(m._solver_result.solver.termination_condition) == "optimal"
         d = extract_instance_data(problem, m)
@@ -110,8 +110,8 @@ def test_simultaneous_gbm_pounce_converges_like_cyipopt():
     def run(backend):
         m, _ = solve_simultaneous(
             problem, mlp, SimultaneousConfig(use_gbm=True, reg_coef=1e-3),
-            data=sdata, smoother_model=fresh_smoother(), backend=backend,
-            pounce_options={"tol": 1e-6, "max_iter": 300})
+            data=sdata, smoother_model=fresh_smoother(), nlp_solver=backend,
+            solver_options={"tol": 1e-6, "max_iter": 300})
         return str(m._solver_result.solver.termination_condition)
 
     assert run("cyipopt") == "optimal"

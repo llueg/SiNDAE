@@ -131,7 +131,7 @@ elif METHOD == 'simul':
     trained_m, mlp = solve_simultaneous(
         problem=problem, mlp=mlp, cfg=simul_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        pounce_options=simul_pounce, tee=True,
+        solver_options=simul_pounce, tee=True,
     )
 
 else:

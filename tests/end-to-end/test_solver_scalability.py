@@ -159,8 +159,8 @@ def _time_simultaneous(nfe_train: int, solver_name: str) -> float:
         problem=problem, mlp=mlp,
         cfg=SimultaneousConfig(use_gbm=False, reg_coef=REG_COEF),
         data=data, smoother_model=smoother_m,
-        pounce_options={'hessian_approximation': HESS_APPROX},
-        backend=solver_name,
+        solver_options={'hessian_approximation': HESS_APPROX},
+        nlp_solver=solver_name,
         tee=False,
     )
     return time.perf_counter() - t0

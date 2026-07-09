@@ -100,7 +100,7 @@ and the GBM path (reads flat Pyomo Var values).
 ### `solve_simultaneous`
 
 ```python
-solve_simultaneous(problem: ProblemDefinition, mlp: SimpleMLP, cfg: SimultaneousConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, pounce_options: Optional[dict] = None, backend: Optional[str] = None, traj_indices: Optional[List[int]] = None, tee: bool = False, timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP]
+solve_simultaneous(problem: ProblemDefinition, mlp: SimpleMLP, cfg: SimultaneousConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, solver_options: Optional[dict] = None, nlp_solver: Optional[str] = None, traj_indices: Optional[List[int]] = None, tee: bool = False, timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP]
 ```
 
 Build and solve the simultaneous NLP, returning the solved model and
@@ -113,12 +113,12 @@ the trained SimpleMLP.
 - **`cfg`** (`SimultaneousConfig`) — Algorithm hyperparameters (``use_gbm``, ``reg_coef``).
 - **`data`** (`InstanceData`) — Provides normalization statistics (input_mean/std, output_mean/std).
 - **`smoother_model`** (`Optional[pyo.ConcreteModel]`, default `None`) — Solved smoother model to reuse (warm-starts the simultaneous solve and avoids rebuilding / re-discretising the model).
-- **`pounce_options`** (`Optional[dict]`, default `None`) — Extra solver options, e.g. ``{'max_iter': 500, 'tol': 1e-6, 'hessian_approximation': 'limited-memory'}``. Passed to POUNCE (expression-writing) or cyipopt (GBM) depending on ``cfg.use_gbm``.
-- **`backend`** (`Optional[str]`, default `None`) — NLP backend (``'pounce'`` default, ``'ipopt'`` / ``'cyipopt'``). Applies to both paths. When ``cfg.use_gbm`` is True the backend must be grey-box-capable (POUNCE / cyipopt); ``'ipopt'`` is rejected there.
+- **`solver_options`** (`Optional[dict]`, default `None`) — Extra solver options, e.g. ``{'max_iter': 500, 'tol': 1e-6, 'hessian_approximation': 'limited-memory'}``. Passed to the selected NLP backend on either path.
+- **`nlp_solver`** (`Optional[str]`, default `None`) — NLP backend (``'pounce'`` default, ``'ipopt'`` / ``'cyipopt'``). Applies to both paths. When ``cfg.use_gbm`` is True the backend must be grey-box-capable (POUNCE / cyipopt); ``'ipopt'`` is rejected there.
 - **`traj_indices`** (`Optional[List[int]]`, default `None`)
 - **`tee`** (`bool`, default `False`) — Stream solver output to stdout.
 - **`timer`** (`Optional[HierarchicalTimer]`, default `None`) — Reuse an external timer; a fresh one is created when omitted.
-- **`unfix_io`** (`bool`, default `True`) — Unfix the NN input/output variables before solving (default True).
+- **`unfix_io`** (`bool`, default `True`) — Unfix the NN input/output variables before solving. Set False for partially observed problems: unmeasured states have no data anchor, and leaving their variables free makes the solve diverge.
 
 **Returns**
 

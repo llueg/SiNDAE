@@ -69,7 +69,7 @@ def test_end_to_end_simultaneous():
     cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)
     trained_m, mlp = solve_simultaneous(
         problem, mlp, cfg, data=smoother_data, smoother_model=smoother_m,
-        pounce_options={"tol": 1e-5, "max_iter": 200},
+        solver_options={"tol": 1e-5, "max_iter": 200},
     )
 
     tc = str(trained_m._solver_result.solver.termination_condition)

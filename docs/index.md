@@ -27,24 +27,28 @@ Lagrange–Radau collocation for time discretization.
 ## Quickstart
 
 ```python
-import jax
-from sindae import SimpleMLP, generate_data
-from sindae.algorithms.smoother import solve_smoother
-from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
-from sindae.example_problems import LeslieGowerProblem
+import numpy as np
+import sindae as sd
 
-problem = LeslieGowerProblem(nfe=40, ncp=3)
-mlp = SimpleMLP(in_size=2, out_size=1, widths=[16, 16],
-                activations=[jax.nn.softplus]*2)
+problem = sd.LeslieGowerProblem(nfe=40, ncp=3)
+sd.generate_data(problem, noise_std=[0.05, 0.05])
 
-data = generate_data(problem, noise_std=[0.05, 0.05])
-smoother_m = solve_smoother(problem, mlp)
-cfg = SimultaneousConfig(use_gbm=False, reg_coef=1e-3)
-trained_m, mlp = solve_simultaneous(problem, mlp, cfg, data=data,
-                                    smoother_model=smoother_m)
+mlp = sd.SimpleMLP(in_size=2, out_size=1, widths=[16, 16],
+                   activations=[jax.nn.softplus] * 2)
+
+model = sd.HybridDAE(
+    method="simultaneous",              # or "decomposition"
+    net=mlp,
+    train=sd.SimultaneousConfig(reg_coef=1e-3),
+)
+model.fit(problem)                      # smoother -> pretrain -> train
+
+new_problem = sd.LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=40, ncp=3)
+pred = model.predict(new_problem, slack_coef=1e-5)
 ```
 
-See [](quickstart.md) for the full walkthrough.
+See [](quickstart.md) for the full walkthrough, including the stage-level
+functions behind the wrapper.
 
 ---
 

@@ -115,3 +115,29 @@ def test_make_linear_solver_unknown_raises():
 def test_make_linear_solver_passes_through_instance():
     s = FeralInterface()
     assert make_linear_solver(s) is s
+
+
+# ── SolverConfig ──────────────────────────────────────────────────────────────
+
+def test_solver_config_to_dict_skips_unset_fields():
+    from sindae.solvers import SolverConfig
+
+    cfg = SolverConfig(tol=1e-7, max_iter=123)
+    assert cfg.to_dict() == {"tol": 1e-7, "max_iter": 123}
+
+
+def test_solver_config_extra_options_merge_and_precedence():
+    from sindae.solvers import SolverConfig
+
+    cfg = SolverConfig(tol=1e-7, extra_options={"print_level": 3, "tol": 1e-2})
+    d = cfg.to_dict()
+    assert d["print_level"] == 3
+    assert d["tol"] == 1e-7  # named fields win over extra_options
+
+
+def test_make_nlp_solver_accepts_solver_config():
+    from sindae.solvers import SolverConfig
+
+    s = make_nlp_solver("pounce", options=SolverConfig(tol=1e-7, max_iter=123))
+    assert s.pyomo_solver.options["tol"] == 1e-7
+    assert s.pyomo_solver.options["max_iter"] == 123

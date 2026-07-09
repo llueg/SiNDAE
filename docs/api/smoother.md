@@ -7,6 +7,8 @@ warm-start values and normalization statistics used by subsequent training. It p
 the time derivative of the NN-output variable $z_\text{smooth}$, weighted by `smooth_coef`
 (larger ⇒ smoother fit).
 
+- [`SmootherConfig`](#sindae.algorithms.smoother.SmootherConfig) holds the stage's
+  hyperparameters; it is what `HybridDAE(smoother=...)` takes.
 - [`build_smoother_model`](#sindae.algorithms.smoother.build_smoother_model) constructs
   the Pyomo model.
 - [`solve_smoother`](#sindae.algorithms.smoother.solve_smoother) builds and solves it,

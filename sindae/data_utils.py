@@ -166,8 +166,8 @@ def generate_data(
     obs_every: int = 1,
     seed: int = 0,
     noise_std: Optional[np.ndarray] = None,
-    pounce_options: Optional[dict] = None,
-    backend: str = 'pounce',
+    solver_options: Optional[dict] = None,
+    nlp_solver: str = 'pounce',
     tee: bool = False,
 ) -> InstanceData:
     """
@@ -191,9 +191,9 @@ def generate_data(
         1 = observe at all collocation points (default).
     seed        : int
         RNG seed for reproducible noise.
-    pounce_options : dict, optional
+    solver_options : dict or SolverConfig, optional
         Extra NLP solver options, e.g. {'tol': 1e-9}.
-    backend     : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
+    nlp_solver  : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
         NLP solver backend used for the true-model solve.
     tee         : bool
         Pass through to the NLP solver (print output if True).
@@ -227,7 +227,7 @@ def generate_data(
     m.obj = pyo.Objective(expr=0.0)
 
     # ── Solve ─────────────────────────────────────────────────────────────────
-    solver = make_nlp_solver(backend, pounce_options)
+    solver = make_nlp_solver(nlp_solver, solver_options)
     try:
         result = solver.solve(m, tee=tee).result
     except Exception as e:

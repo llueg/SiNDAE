@@ -29,7 +29,7 @@ trained_m, mlp = solve_simultaneous(
     problem, mlp, cfg,
     data=smoother_data,              # normalization statistics
     smoother_model=smoother_m,       # reuse the discretized smoother as a warm start
-    pounce_options={'tol': 1e-6, 'max_iter': 1000},
+    solver_options={'tol': 1e-6, 'max_iter': 1000},
 )
 trained_data = extract_instance_data(problem, trained_m)
 ```
@@ -41,7 +41,7 @@ grey-box variant with a limited-memory Hessian:
 cfg = SimultaneousConfig(use_gbm=True, reg_coef=1e-3)
 trained_m, mlp = solve_simultaneous(
     problem, mlp, cfg, data=smoother_data, smoother_model=smoother_m,
-    pounce_options={'tol': 1e-6, 'max_iter': 1000,
+    solver_options={'tol': 1e-6, 'max_iter': 1000,
                     'hessian_approximation': 'limited-memory'},
 )
 ```

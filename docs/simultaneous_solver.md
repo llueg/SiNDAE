@@ -42,7 +42,7 @@ $\alpha_r$ (the `reg_coef` argument). The network constraint is embedded symboli
 NN computations are written as explicit Pyomo expressions. This exposes the exact second-order
 structure to IPOPT, enabling the full Hessian and typically faster convergence.
 
-Solver: POUNCE by default. Pass `backend='ipopt'` (or `backend='cyipopt'`) to
+Solver: POUNCE by default. Pass `nlp_solver='ipopt'` (or `nlp_solver='cyipopt'`) to
 `solve_simultaneous` to use an alternative ASL backend (see [](api/solvers.md)).
 
 ### Grey-box model (`use_gbm=True`)
@@ -52,11 +52,15 @@ The NN forward pass is wrapped in a `NNSimulGreyBoxModel` (a `PyNumero`
 approximated via **L-BFGS**. Slower per iteration but scales better to large networks.
 
 Solver: POUNCE by default, through its grey-box (cyipopt-style) interface; pass
-`backend='cyipopt'` to use cyipopt instead. L-BFGS is selected automatically.
+`nlp_solver='cyipopt'` to use cyipopt instead. L-BFGS is selected automatically.
 
 ---
 
 ## Usage
+
+The high-level wrapper drives this method with
+[`HybridDAE(method="simultaneous", ...)`](api/hybrid_dae.md); the stage-level
+call is:
 
 ```python
 from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
@@ -71,7 +75,7 @@ trained_m, mlp = solve_simultaneous(
     cfg=cfg,
     data=smoother_data,           # provides normalization stats
     smoother_model=smoother_m,    # warm-start (optional but recommended)
-    pounce_options={
+    solver_options={
         'tol': 1e-6,
         'max_iter': 1000,
     },

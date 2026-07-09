@@ -20,6 +20,8 @@ equations*](https://arxiv.org/abs/2504.04665) (Lueg et al., 2025).
 
 ## Features
 
+- **A scikit-learn-style facade**: `HybridDAE(...)` runs the whole pipeline behind
+  `fit(problem)` / `predict(new_problem)`, with every stage still configurable.
 - **Two training backends** behind a symmetric API: a *simultaneous* approach that
   solves for the network weights and the trajectory jointly in one NLP, and a
   *decomposition* approach that wraps an outer Adam loop around inner DAE solves with
@@ -62,8 +64,34 @@ pip install -e ".[full,test]"
 
 ## Quickstart
 
-Generate noisy data from a built-in example, fit the hybrid model, and extract the
-trained trajectory:
+Generate noisy data from a built-in example, fit the hybrid model, and predict under
+new conditions with the `HybridDAE` wrapper:
+
+```python
+import jax
+import numpy as np
+import sindae as sd
+
+jax.config.update("jax_enable_x64", True)
+
+problem = sd.LeslieGowerProblem(nfe=40, ncp=3)
+sd.generate_data(problem, noise_std=[0.05, 0.05])   # or load your own measurements
+
+mlp = sd.SimpleMLP(in_size=2, out_size=1, widths=[16, 16],
+                   activations=[jax.nn.softplus] * 2)
+
+model = sd.HybridDAE(
+    method="simultaneous",              # or "decomposition"
+    net=mlp,
+    train=sd.SimultaneousConfig(reg_coef=1e-3),
+)
+model.fit(problem)                      # smoother -> pretrain -> train
+
+new_problem = sd.LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=40, ncp=3)
+pred = model.predict(new_problem, slack_coef=1e-5)   # inference on new conditions
+```
+
+The stage functions behind the wrapper remain available for full control:
 
 ```python
 import jax
@@ -103,7 +131,8 @@ See the [Quickstart guide](docs/quickstart.md) for the full walkthrough.
 
 A typical workflow has four stages: build a problem, solve a *smoother* to get smooth
 warm-start trajectories and normalization statistics, pre-train the network on those,
-then train the hybrid model with one of the two backends.
+then train the hybrid model with one of the two backends. `HybridDAE.fit` runs all
+four; the entry points below give stage-level control.
 
 | Backend | Entry point | Idea |
 |---------|-------------|------|

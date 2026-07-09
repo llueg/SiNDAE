@@ -31,7 +31,7 @@ Hyperparameters for the decomposition (Adam + KKT gradient) training loop.
 ### `train_decomp`
 
 ```python
-train_decomp(problem: ProblemDefinition, mlp: SimpleMLP, cfg: DecompConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, mpi_comm = None, solver_options: Optional[dict] = None, backend: str = 'pounce', linear_solver: str = 'feral') -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]
+train_decomp(problem: ProblemDefinition, mlp: SimpleMLP, cfg: DecompConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, mpi_comm = None, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', linear_solver: str = 'feral', unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]
 ```
 
 Train a neural network via the decomposition (GBM + KKT gradient) approach.
@@ -48,8 +48,9 @@ Pretraining is NOT handled here — call ``pretrain_mlp`` from
 - **`smoother_model`** (`Optional[pyo.ConcreteModel]`, default `None`) — When provided, reused as the decomp NLP base (no rebuild / re-discretisation); IPOPT warm-starts from the smoother solution.
 - **`mpi_comm`** (default `None`)
 - **`solver_options`** (`Optional[dict]`, default `None`) — Options passed to the NLP backend, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
-- **`backend`** (`str`, default `'pounce'`) — NLP solver for the inner grey-box solve. Must be grey-box-capable.
+- **`nlp_solver`** (`str`, default `'pounce'`) — NLP solver for the inner grey-box solve. Must be grey-box-capable.
 - **`linear_solver`** (`str`, default `'feral'`) — KKT/linear solver for the decomposition gradient back-solve.
+- **`unfix_io`** (`bool`, default `True`) — Unfix the NN input/output variables in the decomposition model. Set False for partially observed problems.
 
 **Returns**
 

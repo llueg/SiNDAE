@@ -13,12 +13,16 @@ decomposition gradient.
 - [`NLPSolver`](#sindae.solvers.NLPSolver) is the abstract backend interface returned
   by `make_nlp_solver`; [`NLPResult`](#sindae.solvers.NLPResult) is what its `solve`
   method returns.
+- [`SolverConfig`](#sindae.solvers.SolverConfig) is the typed home for NLP solver
+  options (`tol`, `max_iter`, ...); `HybridDAE(solver_options=)` requires it, and
+  everything else accepts it interchangeably with a plain option dict.
 
 The stage functions take these selectors directly, so a backend can be chosen without
 touching the package internals. `solve_smoother`, `generate_data`, `solve_simultaneous`
 (both the expression-writing and grey-box paths), `solve_inference`, and `train_decomp`
-all accept `backend=` (default `pounce`); `solve_inference` and `train_decomp` also take
-`solver_options=`, and `train_decomp` takes `linear_solver=` for the KKT back-solve.
+all accept `nlp_solver=` (default `pounce`) and `solver_options=` (a plain dict or a
+[`SolverConfig`](#sindae.solvers.SolverConfig)), and `train_decomp` takes
+`linear_solver=` for the KKT back-solve.
 POUNCE solves the grey-box (`ExternalGreyBoxBlock`) models too, through its cyipopt-style
 interface, so cyipopt is no longer required for the decomposition, inference, or grey-box
 simultaneous solves. `cyipopt` and `ipopt` remain selectable, not removed.
@@ -31,7 +35,7 @@ from sindae.algorithms.smoother import solve_smoother
 from sindae.algorithms.decomp.train import train_decomp
 
 # Pick the NLP backend for a stage (default is "pounce"):
-smoother_m = solve_smoother(problem, mlp, smooth_coef=1.0, backend="ipopt")
+smoother_m = solve_smoother(problem, mlp, smooth_coef=1.0, nlp_solver="ipopt")
 
 # Pick the KKT linear solver for decomposition training (default is "feral"):
 trained_m, mlp, history = train_decomp(

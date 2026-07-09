@@ -16,6 +16,44 @@ jax.config.update('jax_enable_x64', True)
 
 ---
 
+## The short way: HybridDAE
+
+The `HybridDAE` wrapper runs the entire pipeline (smoother, optional pretraining,
+training, inference) behind a scikit-learn-style fit/predict interface:
+
+```python
+import jax
+import numpy as np
+import sindae as sd
+
+problem = sd.LeslieGowerProblem(nfe=40, ncp=3)
+sd.generate_data(problem, noise_std=np.array([0.05, 0.05]), obs_every=4)
+
+mlp = sd.SimpleMLP(
+    in_size=problem.input_dim, out_size=problem.z_dim,
+    widths=[16, 16], activations=[jax.nn.softplus] * 2,
+    key=jax.random.PRNGKey(0),
+)
+
+model = sd.HybridDAE(
+    method="simultaneous",                        # or "decomposition"
+    net=mlp,
+    train=sd.SimultaneousConfig(reg_coef=1e-3),   # DecompConfig for "decomposition"
+    solver_options=sd.SolverConfig(tol=1e-6, max_iter=1000),
+)
+model.fit(problem)
+
+new_problem = sd.LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=40, ncp=3)
+pred = model.predict(new_problem, slack_coef=1e-5)
+```
+
+See the [HybridDAE API page](api/hybrid_dae.md) for all options, including the
+solver selectors (`nlp_solver=`, `linear_solver=`, `solver_options=`). The rest of
+this page walks the same pipeline stage by stage, which is also how you get full
+control over each step.
+
+---
+
 ## 1. Define or import a problem
 
 SiNDAE represents a system via a `ProblemDefinition` subclass. Three built-in problems are
@@ -101,7 +139,7 @@ trained_m, mlp = solve_simultaneous(
     cfg=cfg,
     data=smoother_data,
     smoother_model=smoother_m,  # warm-start from smoother
-    pounce_options={'tol': 1e-6, 'max_iter': 1000},
+    solver_options={'tol': 1e-6, 'max_iter': 1000},
 )
 ```
 
