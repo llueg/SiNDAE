@@ -46,6 +46,7 @@ MANIFEST: dict[str, list[str]] = {
     "data_utils": [
         "data_utils.TrajectoryData",
         "data_utils.InstanceData",
+        "data_utils.NormStats",
         "data_utils.extract_instance_data",
         "data_utils.generate_data",
     ],

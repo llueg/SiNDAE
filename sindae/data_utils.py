@@ -40,6 +40,22 @@ class TrajectoryData:
     aux_vars:       Optional[np.ndarray] = None  # (num_t, aux_dim) or None
 
 
+@dataclass
+class NormStats:
+    """The four normalization vectors ``solve_inference`` consumes.
+
+    An :class:`InstanceData` exposes the same four attributes as properties;
+    ``NormStats`` is the lightweight stand-in restored by ``HybridDAE.load``,
+    which persists the scaler but not the full training trajectories.  Anywhere
+    an ``InstanceData`` is used only for normalization statistics (e.g.
+    ``make_inference_model``), a ``NormStats`` is a drop-in replacement.
+    """
+    input_mean:  np.ndarray              # (input_dim,)
+    input_std:   np.ndarray              # (input_dim,)
+    output_mean: np.ndarray              # (output_dim,)
+    output_std:  np.ndarray              # (output_dim,)
+
+
 class InstanceData:
     """
     Container for multi-trajectory solution data extracted from a solved Pyomo model.

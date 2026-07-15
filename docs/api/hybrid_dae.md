@@ -71,7 +71,19 @@ new_problem = sd.LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=40, ncp=3)
 pred = model.predict(new_problem, slack_coef=1e-5)
 
 mu_hat = model.net                     # the trained SimpleMLP
+
+# Persist the trained network and its scaler, then reload
+model.save("mu_hat.eqx")
+reloaded = sd.HybridDAE.load("mu_hat.eqx")
+pred = reloaded.predict(new_problem, slack_coef=1e-5)   # scaler restored
 ```
+
+`save` writes the network weights, its architecture, and the four
+normalization vectors the inference stage needs, so a reloaded model can
+`predict` right away or warm-start a fresh `fit` from the loaded weights. The
+stage configs and training trajectories are not persisted, so `load` is for
+resuming or serving a trained network, not for reproducing the original solve
+bit for bit.
 
 The smoother stage is configured the same way when its defaults are not right,
 for example `smoother=sd.SmootherConfig(smooth_coef=10.0)` for noisier data.

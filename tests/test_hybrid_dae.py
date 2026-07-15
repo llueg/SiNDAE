@@ -265,6 +265,133 @@ def test_fit_pretrains_by_default_and_warns_on_non_optimal(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Persistence: save / load (net + scaler + architecture)
+# ---------------------------------------------------------------------------
+
+def _fake_fitted(mlp=None):
+    """A HybridDAE with a simulated completed fit (no solver).
+
+    Sets the trained network, a smoother_data carrying real normalization
+    statistics, method and termination — the minimal state save() persists.
+    """
+    from sindae import HybridDAE, InstanceData, TrajectoryData
+
+    if mlp is None:
+        mlp = _mlp()
+    traj = TrajectoryData(
+        sampling_times=np.array([0.0, 1.0]),
+        nn_input=np.array([[0.1, 0.2], [0.3, 0.5]]),
+        nn_output=np.array([[1.0], [2.0]]),
+        obs=np.array([[0.1, 0.2], [0.3, 0.5]]),
+    )
+    model = HybridDAE(net=mlp)
+    model._net = mlp
+    model.smoother_data = InstanceData([traj])
+    model.termination = "optimal"
+    return model
+
+
+def test_save_requires_fitted(tmp_path):
+    from sindae import HybridDAE
+
+    model = HybridDAE(net=_mlp())
+    with pytest.raises(RuntimeError, match="fit"):
+        model.save(tmp_path / "m.eqx")
+
+
+def test_load_is_classmethod_returning_fitted_wrapper(tmp_path):
+    """HybridDAE.load(path) reconstructs a fitted wrapper without an instance."""
+    from sindae import HybridDAE
+
+    path = tmp_path / "m.eqx"
+    _fake_fitted().save(path)
+
+    loaded = HybridDAE.load(path)
+    assert isinstance(loaded, HybridDAE)
+    assert loaded.net is not None       # .net does not raise -> fitted
+    loaded._check_fitted()              # guard passes
+
+
+def test_save_load_roundtrip_preserves_weights_and_scaler(tmp_path):
+    from sindae import HybridDAE
+    from sindae.nn_utils import flatten_fn
+
+    model = _fake_fitted()
+    path = tmp_path / "m.eqx"
+    model.save(path)
+    loaded = HybridDAE.load(path)
+
+    # Weights bit-for-bit.
+    np.testing.assert_array_equal(flatten_fn(loaded.net), flatten_fn(model.net))
+    # Architecture.
+    assert loaded.net.in_size == model.net.in_size
+    assert loaded.net.out_size == model.net.out_size
+    assert list(loaded.net.widths) == list(model.net.widths)
+    # Scaler (the four norm vectors solve_inference consumes).
+    for attr in ("input_mean", "input_std", "output_mean", "output_std"):
+        np.testing.assert_allclose(
+            np.asarray(getattr(loaded.smoother_data, attr)),
+            np.asarray(getattr(model.smoother_data, attr)),
+        )
+    # Metadata.
+    assert loaded.method == model.method
+    assert loaded.termination == "optimal"
+
+
+def test_save_load_preserves_activation_strings(tmp_path):
+    """Activations round-trip through their string names (mixed set)."""
+    import jax.numpy as jnp
+
+    from sindae import HybridDAE, SimpleMLP
+    from sindae.nn_utils import _act_jax2str
+
+    mlp = SimpleMLP(2, 1, [8, 8], [jnp.tanh, jax.nn.softplus],
+                    key=jax.random.PRNGKey(1))
+    path = tmp_path / "m.eqx"
+    _fake_fitted(mlp).save(path)
+
+    loaded = HybridDAE.load(path)
+    assert [_act_jax2str(a) for a in loaded.net.activations] == ["tanh", "softplus"]
+
+
+@needs_asl
+def test_save_load_predict_matches_original(tmp_path):
+    """A loaded model predicts bit-for-bit the same as the model that saved it."""
+    from sindae import (
+        HybridDAE,
+        PretrainConfig,
+        SimultaneousConfig,
+        SmootherConfig,
+        SolverConfig,
+    )
+    from sindae.example_problems import LeslieGowerProblem
+
+    problem = _observed_problem()
+    model = HybridDAE(
+        net=_mlp(),
+        smoother=SmootherConfig(smooth_coef=1.0),
+        pretrain=PretrainConfig(epochs=5),
+        train=SimultaneousConfig(reg_coef=1e-3),
+        solver_options=SolverConfig(tol=1e-5, max_iter=200),
+    )
+    model.fit(problem)
+
+    path = tmp_path / "m.eqx"
+    model.save(path)
+    loaded = HybridDAE.load(path)
+
+    new_problem = LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=15, ncp=2)
+    ref = model.predict(new_problem, slack_coef=1e-5,
+                        solver_options=SolverConfig(tol=1e-6))
+    assert str(model.inference_model._solver_result.solver.termination_condition) \
+        == "optimal"
+    got = loaded.predict(new_problem, slack_coef=1e-5,
+                        solver_options=SolverConfig(tol=1e-6))
+    np.testing.assert_allclose(got[0].nn_output, ref[0].nn_output,
+                               rtol=1e-6, atol=1e-8)
+
+
+# ---------------------------------------------------------------------------
 # End-to-end (POUNCE/FERAL default stack)
 # ---------------------------------------------------------------------------
 

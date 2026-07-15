@@ -89,6 +89,29 @@ load_from_file(filename: str) -> InstanceData
 - `InstanceData`
 
 
+(sindae.data_utils.NormStats)=
+### `NormStats`
+
+```python
+class NormStats(input_mean: np.ndarray, input_std: np.ndarray, output_mean: np.ndarray, output_std: np.ndarray)
+```
+
+The four normalization vectors ``solve_inference`` consumes.
+
+An :class:`InstanceData` exposes the same four attributes as properties;
+``NormStats`` is the lightweight stand-in restored by ``HybridDAE.load``,
+which persists the scaler but not the full training trajectories.  Anywhere
+an ``InstanceData`` is used only for normalization statistics (e.g.
+``make_inference_model``), a ``NormStats`` is a drop-in replacement.
+
+**Fields**
+
+- **`input_mean`** (`np.ndarray`)
+- **`input_std`** (`np.ndarray`)
+- **`output_mean`** (`np.ndarray`)
+- **`output_std`** (`np.ndarray`)
+
+
 (sindae.data_utils.extract_instance_data)=
 ### `extract_instance_data`
 

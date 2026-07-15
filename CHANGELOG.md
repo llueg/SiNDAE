@@ -25,6 +25,16 @@ All notable user-visible changes to SiNDAE. The format follows
   plain dict by `make_nlp_solver` and the stage functions).
 - `train_decomp` now accepts `unfix_io=` and forwards it to the decomposition
   model build (previously only `build_decomp_model` exposed it).
+- `HybridDAE.save(path)` / `HybridDAE.load(path)`: persist a fitted model as a
+  one-line JSON manifest (architecture, activation names, and the four
+  normalization vectors) followed by the Equinox leaf arrays. `load` is a
+  classmethod returning a fitted wrapper that can `predict` immediately (the
+  scaler is restored) or warm-start a fresh `fit` from the loaded weights. The
+  stage configs and training trajectories are not persisted.
+- New `sindae.NormStats` dataclass: the four normalization vectors
+  (`input_mean`/`input_std`/`output_mean`/`output_std`) that the inference stage
+  consumes. A drop-in for `InstanceData` wherever only normalization statistics
+  are needed; restored onto `smoother_data` by `HybridDAE.load`.
 
 ### Changed
 - The stage functions' NLP backend selector is now `nlp_solver=` (was

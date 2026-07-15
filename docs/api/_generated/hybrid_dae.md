@@ -84,3 +84,64 @@ a non-optimal solve raises a ``UserWarning``.
 **Returns**
 
 - (`InstanceData`) — Predicted trajectories at the collocation points.
+
+(sindae.hybrid_dae.HybridDAE.save)=
+#### `save`
+
+```python
+save(path) -> None
+```
+
+Serialize the trained network and its scaler to ``path``.
+
+Writes a one-line JSON manifest (architecture, activation names, the
+four normalization vectors from ``smoother_data``, plus ``method`` and
+``termination``) followed by the Equinox leaf arrays.  Reload with
+:meth:`HybridDAE.load`.
+
+Only the network and scaler are persisted, not the stage configs or the
+training trajectories, so a loaded model can ``predict`` or warm-start a
+fresh ``fit`` but cannot reproduce the original solve bit-for-bit.
+
+**Parameters**
+
+- **`path`** — Destination file (the parent directory must exist).
+
+(sindae.hybrid_dae.HybridDAE.load)=
+#### `load`
+
+```python
+load(cls, path) -> 'HybridDAE'
+```
+
+Reconstruct a fitted :class:`HybridDAE` from a :meth:`save` file.
+
+The returned wrapper can ``predict`` immediately (the scaler is
+restored on ``smoother_data`` as a :class:`NormStats`) or ``fit`` again
+to warm-start from the loaded weights.  ``trained_data`` and the stage
+configs are not restored (they are not persisted); ``fit`` would use the
+default configs.
+
+**Parameters**
+
+- **`cls`**
+- **`path`** — A file written by :meth:`save`.
+
+**Returns**
+
+- (`HybridDAE`) — A fitted wrapper carrying the loaded network and scaler.
+
+(sindae.hybrid_dae.HybridDAE.export)=
+#### `export`
+
+```python
+export(path = 'exported_models/', format = 'ONNX')
+```
+
+Export the trained NN into ONNX, or json format with the scaler and IO 
+contract based on the model pyomo model.
+
+**Parameters**
+
+- **`path`** (default `'exported_models/'`)
+- **`format`** (default `'ONNX'`)

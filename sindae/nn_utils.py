@@ -91,6 +91,13 @@ class SimpleMLP(eqx.Module):
         x = self.layers[-1](x)
         return x
 
+def make_simple_mlp(*, key, in_size, out_size, widths, activations):
+    return SimpleMLP(in_size=in_size,
+                     out_size=out_size,
+                     widths=widths,
+                     activations=activations,
+                     key=key)
+
 
 def train_eqx_mlp(
     mlp: SimpleMLP,

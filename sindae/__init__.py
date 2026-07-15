@@ -3,6 +3,7 @@ from sindae.nn_utils import flatten_fn as flatten_fn
 from sindae.nn_utils import make_unflatten_fn as make_unflatten_fn
 from sindae.data_utils import InstanceData as InstanceData
 from sindae.data_utils import TrajectoryData as TrajectoryData
+from sindae.data_utils import NormStats as NormStats
 from sindae.data_utils import extract_instance_data as extract_instance_data
 from sindae.data_utils import generate_data as generate_data
 from sindae.problem import ProblemDefinition as ProblemDefinition

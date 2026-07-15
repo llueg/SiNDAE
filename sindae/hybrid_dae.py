@@ -53,7 +53,7 @@ from __future__ import annotations
 import warnings
 from typing import Optional, Union
 
-from sindae.data_utils import InstanceData, extract_instance_data
+from sindae.data_utils import InstanceData, NormStats, extract_instance_data
 from sindae.nn_utils import SimpleMLP
 from sindae.problem import ProblemDefinition
 from sindae.solvers import SolverConfig
@@ -62,6 +62,13 @@ from sindae.algorithms.pretrain import PretrainConfig, pretrain_mlp
 from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 from sindae.algorithms.decomp.train import DecompConfig, train_decomp
 from sindae.algorithms.inference import solve_inference
+from sindae.nn_utils import make_simple_mlp, _act_jax2str, _act_str2jax
+
+import equinox as eqx
+import jax
+import json
+import numpy as np
+from jax2onnx import to_onnx
 
 _METHODS = ("simultaneous", "decomposition")
 _NLP_SOLVERS = ("pounce", "ipopt", "cyipopt")
@@ -386,3 +393,111 @@ class HybridDAE:
         self._check_solve("inference", m)
         self.inference_model = m
         return extract_instance_data(problem, m)
+
+
+    def save(self, path) -> None:
+        """Serialize the trained network and its scaler to ``path``.
+
+        Writes a one-line JSON manifest (architecture, activation names, the
+        four normalization vectors from ``smoother_data``, plus ``method`` and
+        ``termination``) followed by the Equinox leaf arrays.  Reload with
+        :meth:`HybridDAE.load`.
+
+        Only the network and scaler are persisted, not the stage configs or the
+        training trajectories, so a loaded model can ``predict`` or warm-start a
+        fresh ``fit`` but cannot reproduce the original solve bit-for-bit.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Destination file (the parent directory must exist).
+        """
+        self._check_fitted()
+        sd = self.smoother_data
+        manifest = {
+            "format_version": 1,
+            "in_size": self._net.in_size,
+            "out_size": self._net.out_size,
+            "widths": list(self._net.widths),
+            "activations": [_act_jax2str(a) for a in self._net.activations],
+            "norm": {
+                "input_mean":  np.asarray(sd.input_mean).tolist(),
+                "input_std":   np.asarray(sd.input_std).tolist(),
+                "output_mean": np.asarray(sd.output_mean).tolist(),
+                "output_std":  np.asarray(sd.output_std).tolist(),
+            },
+            "method": self.method,
+            "termination": self.termination,
+        }
+        with open(path, "wb") as f:
+            f.write((json.dumps(manifest) + "\n").encode())
+            eqx.tree_serialise_leaves(f, self._net)
+
+    @classmethod
+    def load(cls, path) -> "HybridDAE":
+        """Reconstruct a fitted :class:`HybridDAE` from a :meth:`save` file.
+
+        The returned wrapper can ``predict`` immediately (the scaler is
+        restored on ``smoother_data`` as a :class:`NormStats`) or ``fit`` again
+        to warm-start from the loaded weights.  ``trained_data`` and the stage
+        configs are not restored (they are not persisted); ``fit`` would use the
+        default configs.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            A file written by :meth:`save`.
+
+        Returns
+        -------
+        HybridDAE
+            A fitted wrapper carrying the loaded network and scaler.
+        """
+        with open(path, "rb") as f:
+            manifest = json.loads(f.readline().decode())
+            skeleton = make_simple_mlp(
+                key=jax.random.PRNGKey(0),
+                in_size=manifest["in_size"],
+                out_size=manifest["out_size"],
+                widths=manifest["widths"],
+                activations=[_act_str2jax(s) for s in manifest["activations"]],
+            )
+            net = eqx.tree_deserialise_leaves(f, skeleton)
+
+        model = cls(net=net, method=manifest["method"])
+        model._net = net
+        norm = manifest["norm"]
+        model.smoother_data = NormStats(
+            input_mean=np.asarray(norm["input_mean"]),
+            input_std=np.asarray(norm["input_std"]),
+            output_mean=np.asarray(norm["output_mean"]),
+            output_std=np.asarray(norm["output_std"]),
+        )
+        model.termination = manifest["termination"]
+        return model
+
+
+    # TODO: Function to export the NN weights for another modelling software like OMLT (ONNX, or JSON format)
+    def export(self, path="exported_models/", format="ONNX"):
+        """
+        Export the trained NN into ONNX, or json format with the scaler and IO 
+        contract based on the model pyomo model.
+        """
+
+        self._check_fitted()
+
+        if format=="json":
+            # Fill in with json saving logic
+            pass
+        else:
+            to_onnx(
+                self.net, 
+                [("B", 32)], 
+                enable_double_precision=True,
+                return_mode="file", 
+                output_path="model.onnx"
+                )
+
+
+
+
