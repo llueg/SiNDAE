@@ -434,7 +434,7 @@ class HybridDAE:
             eqx.tree_serialise_leaves(f, self._net)
 
     @classmethod
-    def load(cls, path) -> "HybridDAE":
+    def load(cls, path, verbose=False) -> "HybridDAE":
         """Reconstruct a fitted :class:`HybridDAE` from a :meth:`save` file.
 
         The returned wrapper can ``predict`` immediately (the scaler is
@@ -447,6 +447,8 @@ class HybridDAE:
         ----------
         path : str or os.PathLike
             A file written by :meth:`save`.
+        verbose : bool
+            Prints the loaded model information contained in the manifest.
 
         Returns
         -------
@@ -455,6 +457,17 @@ class HybridDAE:
         """
         with open(path, "rb") as f:
             manifest = json.loads(f.readline().decode())
+
+            if verbose:
+                print("Loaded model information:")
+                for k, v in manifest.items():
+                    if k == "norm":
+                        print(f"  {k}:")
+                        for nk, nv in v.items():
+                            print(f"    {nk}: {np.asarray(nv)}")
+                    else:
+                        print(f"  {k}: {v}")
+
             skeleton = make_simple_mlp(
                 key=jax.random.PRNGKey(0),
                 in_size=manifest["in_size"],
