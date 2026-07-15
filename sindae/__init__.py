@@ -6,6 +6,9 @@ from sindae.data_utils import TrajectoryData as TrajectoryData
 from sindae.data_utils import extract_instance_data as extract_instance_data
 from sindae.data_utils import generate_data as generate_data
 from sindae.problem import ProblemDefinition as ProblemDefinition
+from sindae.solvers import make_nlp_solver as make_nlp_solver
+from sindae.solvers import make_linear_solver as make_linear_solver
+from sindae.solvers import NLPSolver as NLPSolver
 
 from sindae.algorithms.smoother import build_smoother_model as build_smoother_model
 from sindae.algorithms.smoother import solve_smoother as solve_smoother
@@ -17,6 +20,16 @@ from sindae.algorithms.decomp.model_builder import build_decomp_model as build_d
 from sindae.algorithms.simultaneous.model_builder import build_simultaneous_model as build_simultaneous_model
 from sindae.algorithms.simultaneous.model_builder import build_simultaneous_model_gbm as build_simultaneous_model_gbm
 from sindae.algorithms.simultaneous.model_builder import extract_mlp as extract_mlp
+from sindae.algorithms.simultaneous.train import SimultaneousConfig as SimultaneousConfig
 from sindae.algorithms.simultaneous.train import solve_simultaneous as solve_simultaneous
 from sindae.algorithms.inference import make_inference_model as make_inference_model
 from sindae.algorithms.inference import solve_inference as solve_inference
+from sindae.plot_utils import plot_instance_data, plot_training_history
+from sindae.example_problems import FourTankProblem, LeslieGowerProblem, FedBatchBioreactorProblem
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("sindae")
+except PackageNotFoundError:
+    # Plain source checkout without an installed distribution.
+    __version__ = "0.0.0+unknown"

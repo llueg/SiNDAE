@@ -1,0 +1,7 @@
+#!/bin/bash
+# repo2docker runs this from the repository root after the conda environment is
+# built, so `.` reliably resolves to the package here (unlike a `pip install .`
+# placed inside binder/environment.yml). Dependencies are already installed by
+# binder/environment.yml, hence --no-deps.
+set -euo pipefail
+pip install --no-deps .

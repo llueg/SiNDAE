@@ -12,3 +12,16 @@ plots/
 *.log
 .vscode/
 .idea/
+.claude/
+.pytest_cache/
+CHANGES.md
+CLAUDE.md
+CONTEXT.md
+dev/
+.ruff_cache/
+
+# MyST build outputs
+_build
+
+# macOS Finder metadata
+.DS_Store

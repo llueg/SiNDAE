@@ -1,0 +1,14 @@
+# Docs build dependencies (install in the same environment as sindae).
+#
+# The site is built with Jupyter Book v2, which runs on the mystmd engine
+# (NOT Sphinx). The API reference is generated from docstrings by
+# docs/generate_api.py (griffe -> MyST) and pulled into docs/api/*.md via
+# {include}. Citations/bibliography are handled natively by mystmd
+# (see project.bibliography in myst.yml), so no Sphinx bibtex extension is needed.
+#
+# Build:    jupyter book build --html
+# Preview:  jupyter book start
+# API ref:  python docs/generate_api.py   (run after changing public API/docstrings)
+
+jupyter-book>=2.0          # provides the mystmd-based `jupyter book` CLI
+griffe>=1.0                # introspection backend for docs/generate_api.py

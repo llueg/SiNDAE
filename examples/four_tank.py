@@ -23,7 +23,7 @@ from sindae.data_utils import extract_instance_data, InstanceData
 from sindae.algorithms.smoother import solve_smoother
 from sindae.algorithms.pretrain import PretrainConfig, pretrain_mlp
 from sindae.algorithms.decomp.train import DecompConfig, train_decomp
-from sindae.algorithms.simultaneous.train import solve_simultaneous
+from sindae.algorithms.simultaneous.train import SimultaneousConfig, solve_simultaneous
 
 from sindae.example_problems import FourTankProblem
 from sindae.plot_utils import plot_instance_data, plot_training_history
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 METHOD   = 'decomp'   # 'decomp' | 'simul'
 # simul options
-USE_GBM  = True       # simul only — whether to use GBM in simultaneous training;
+USE_GBM  = False       # simul only — whether to use GBM in simultaneous training;
 HESS_APPROX = 'limited-memory' # alternatively, 'exact'
 if USE_GBM:
     HESS_APPROX = 'limited-memory' # GBM only implemented for jacobian
@@ -67,12 +67,16 @@ decomp_cfg = DecompConfig(
     param_reg_coef        = REG_COEF,
     lr_schedule=lr_schedule,
 )
-# cyipopt options for subproblem solutions
-decomp_cyipopt = {}
+# NLP solver options for subproblem solutions
+decomp_solver_opts = {}
 
-# if exact Hessian desired, disable USE_GBM and set hessian_approximation to 'exact' in simul_ipopt options
-# Ipopt options for simultaneous training 
-simul_ipopt  = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
+simul_cfg = SimultaneousConfig(
+    use_gbm  = USE_GBM,
+    reg_coef = REG_COEF,
+)
+# if exact Hessian desired, disable USE_GBM and set hessian_approximation to 'exact' in simul_pounce options
+# POUNCE options for simultaneous training
+simul_pounce  = dict(tol=1e-6, max_iter=1000, hessian_approximation=HESS_APPROX)
 
 _STATE_NAMES  = ['$x_0$', '$x_1$', '$x_2$', '$x_3$']
 _OUTPUT_NAMES = ['$z_0$', '$z_1$']
@@ -116,20 +120,18 @@ mlp = pretrain_mlp(mlp, smoother_data, PretrainConfig(epochs=200, batch_size=32,
 
 if METHOD == 'decomp':
     logger.info('=== 4. Training (decomposition) ===')
-    mlp, history = train_decomp(
+    trained_m, mlp, history = train_decomp(
         problem=problem, mlp=mlp, cfg=decomp_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        cyipopt_options=decomp_cyipopt,
+        solver_options=decomp_solver_opts,
     )
-    trained_m = smoother_m
 
 elif METHOD == 'simul':
     logger.info('=== 4. Solving simultaneously ===')
     trained_m, mlp = solve_simultaneous(
-        problem=problem, mlp=mlp,
+        problem=problem, mlp=mlp, cfg=simul_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        use_gbm=USE_GBM, reg_coef=REG_COEF,
-        ipopt_options=simul_ipopt, tee=True,
+        pounce_options=simul_pounce, tee=True,
     )
 
 else:

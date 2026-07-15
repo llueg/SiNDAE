@@ -15,7 +15,6 @@ def _act_str2pyo(activation: str) -> Callable:
     elif activation == "softplus":
         return lambda x: pe.log(1 + pe.exp(x))
     elif activation == "swish":
-        # return lambda x: x * (1 / (1 + pe.exp(-x)))
         return lambda x: 0.5 * x * pe.tanh(0.5 * x) + 0.5 * x
     elif activation is None:
         return lambda x: x

@@ -113,8 +113,10 @@ def train_decomp(
     data: InstanceData,
     smoother_model: Optional[pyo.ConcreteModel] = None,
     mpi_comm=None,
-    cyipopt_options: Optional[dict] = None,
-) -> Tuple[SimpleMLP, dict]:
+    solver_options: Optional[dict] = None,
+    backend: str = 'pounce',
+    linear_solver: str = 'feral',
+) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
     """
     Train a neural network via the decomposition (GBM + KKT gradient) approach.
 
@@ -133,13 +135,25 @@ def train_decomp(
         When provided, reused as the decomp NLP base (no rebuild /
         re-discretisation); IPOPT warm-starts from the smoother solution.
     mpi_comm        : mpi4py.MPI.Comm, optional
-    cyipopt_options : dict, optional
-        Options passed to cyipopt, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
+    solver_options  : dict, optional
+        Options passed to the NLP backend, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
+    backend         : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``)
+        NLP solver for the inner grey-box solve.  Must be grey-box-capable.
+    linear_solver   : str  (default ``'feral'``; ``'ma27'`` / ``'scipy'``)
+        KKT/linear solver for the decomposition gradient back-solve.
 
     Returns
     -------
-    mlp     : SimpleMLP  (trained; rank-0 parameters are authoritative)
-    history : dict with keys obj_history, grad_norm_history, diag_history
+    trained_m : pyo.ConcreteModel
+        The solved decomposition NLP (the rank-local model under MPI).  Holds
+        the final training iterate's trajectory; pass to
+        ``extract_instance_data`` to recover states/outputs.  The trajectory
+        reflects the last solve, which may differ slightly from the returned
+        best-weights ``mlp``; for a trajectory strictly consistent with ``mlp``
+        use ``solve_inference``.
+    mlp       : SimpleMLP  (trained; rank-0 parameters are authoritative)
+    history   : dict with keys obj_history, data_fit_history,
+        grad_norm_history, diag_history, pouncetiming_history
     """
     jax.config.update("jax_enable_x64", True)
 
@@ -198,7 +212,9 @@ def train_decomp(
         mu_target=cfg.mu_target,
         slack_coef=cfg.init_slack_coef,
         subsample_frac=cfg.subsample_frac,
-        cyipopt_options=cyipopt_options,
+        solver_options=solver_options,
+        backend=backend,
+        linear_solver=linear_solver,
     )
 
     # Training loop
@@ -213,7 +229,7 @@ def train_decomp(
     data_fit_history     = []
     grad_norm_history    = []
     diag_history         = []
-    ipopt_timing_history = []
+    pouncetiming_history = []
 
     timer = HierarchicalTimer()
     timer.start('training')
@@ -317,7 +333,7 @@ def train_decomp(
             _entry = dict(sub._last_solve_info)
             _entry['wall_step']  = _wall_step
             _entry['wall_solve'] = _wall_solve
-            ipopt_timing_history.append(_entry)
+            pouncetiming_history.append(_entry)
 
         if is_root and step % 10 == 0:
             raw_norm = grad_norm / max(len(flat_params), 1)
@@ -343,10 +359,10 @@ def train_decomp(
         logger.info("=== Training complete ===")
         logger.info(str(timer))
 
-    return unflatten_fn(best_params), {
+    return m, unflatten_fn(best_params), {
         'obj_history':          obj_history,
         'data_fit_history':     data_fit_history,
         'grad_norm_history':    grad_norm_history,
         'diag_history':         diag_history,
-        'ipopt_timing_history': ipopt_timing_history,
+        'pouncetiming_history': pouncetiming_history,
     }

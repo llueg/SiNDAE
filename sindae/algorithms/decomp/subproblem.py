@@ -31,18 +31,16 @@ Expected model structure (produced by build_decomp_model)
 from __future__ import annotations
 
 import logging
-import os
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
-from pyomo.contrib.interior_point.linalg.ma27_interface import InteriorPointMA27Interface
 
 import sindae.algorithms.decomp.kkt_utils as dutils
 from sindae.algorithms.model_builder_utils import NORM_INPUT_NAME, NORM_OBS_NAME
-from sindae.algorithms.timing_utils import parse_ipopt_log, set_output_file, tmp_log_path
+from sindae.solvers import make_linear_solver, make_nlp_solver
 from sindae.interfaces.interior_point_compat import InteriorPointInterface
 from sindae.interfaces.pyomo_grey_box_nlp_extended import PyomoNLPWithGreyBoxBlocksExtended
 
@@ -76,6 +74,13 @@ class TrajectoryBatchSubproblem:
     slack_coef : float
     param_reg_coef : float
     subsample_frac : float
+    backend : str or NLPSolver
+        NLP solver for the inner grey-box solve ('pounce' default; 'cyipopt' /
+        'ipopt' select alternatives).  The KKT gradient needs the populated NLP,
+        so the backend must be grey-box-capable (POUNCE / cyipopt).
+    linear_solver : str or IPLinearSolverInterface
+        KKT/linear solver for the gradient back-solve ('feral' default, 'ma27',
+        'scipy', or a pre-built interface).
     """
 
     def __init__(
@@ -89,7 +94,9 @@ class TrajectoryBatchSubproblem:
         mu_target=1e-10,
         slack_coef=1.0,
         subsample_frac=1.0,
-        cyipopt_options=None,
+        solver_options=None,
+        backend='pounce',
+        linear_solver='feral',
     ):
         self._model         = model
         self._gbm           = gbm
@@ -104,12 +111,15 @@ class TrajectoryBatchSubproblem:
         # Precompile gradient; obj_fun_jax first arg is norm_obs
         self._grad_obj_jit = jax.jit(jax.grad(obj_fun_jax, argnums=(0, 1, 2)))
 
-        self._solver        = pyo.SolverFactory('cyipopt')
-        if cyipopt_options:
-            for k, v in cyipopt_options.items():
-                self._solver.config.options[k] = v
-        self._linear_solver = InteriorPointMA27Interface()
-        self._symbolic_done = False
+        # POUNCE's default (monotone) mu strategy stalls on the cold index-2
+        # DAE inner NLP; the adaptive strategy converges robustly and matches
+        # the cyipopt reference.  Default it in for POUNCE only (cyipopt/ipopt
+        # keep their defaults); a user-supplied mu_strategy always wins.
+        opts = dict(solver_options or {})
+        if isinstance(backend, str) and backend.lower() == 'pounce':
+            opts.setdefault('mu_strategy', 'adaptive')
+        self._nlp_solver    = make_nlp_solver(backend, opts)
+        self._linear_solver = make_linear_solver(linear_solver)
 
         self._extended_nlp = None
         self._interface    = None
@@ -164,13 +174,11 @@ class TrajectoryBatchSubproblem:
             self._model.slack_coef.set_value(slack_coef)
         _s('update_mlp')
 
-        # 2. Solve with cyipopt; return_nlp=True gives us the populated NLP
+        # 2. Solve the inner NLP; return_nlp=True gives us the populated NLP
         _t('solve')
-        _log = tmp_log_path()
-        set_output_file(self._solver, _log, is_cyipopt=True)
-        _result, solved_nlp = self._solver.solve(self._model, return_nlp=True)
-        self._last_solve_info = parse_ipopt_log(_log)
-        os.unlink(_log)
+        _res = self._nlp_solver.solve(self._model, return_nlp=True)
+        solved_nlp = _res.nlp
+        self._last_solve_info = _res.timing
         _lgrg = self._last_solve_info.get('last_lgrg')
         if _lgrg is not None and _lgrg != '-':
             _logger.warning(
@@ -271,7 +279,10 @@ class TrajectoryBatchSubproblem:
 
         First call: builds PyomoNLPWithGreyBoxBlocksExtended (computes sparsity).
         Subsequent calls: swap inner NLP only (reuse sparsity maps).
-        Symbolic factorization of MA27 done exactly once.
+
+        Symbolic factorization of the KKT linear solver is refreshed on each
+        gradient evaluation inside ``v_eval_del_obj_del_param`` (the KKT sparsity
+        pattern is not invariant across steps), so it is not done here.
         """
         def _t(name): return timer.start(name) if timer else None
         def _s(name): return timer.stop(name)  if timer else None
@@ -291,12 +302,6 @@ class TrajectoryBatchSubproblem:
 
         if self._norm_input_idx is None:
             self._compute_indices()
-
-        if not self._symbolic_done:
-            _t('symbolic_fact')
-            dutils.init_linear_solver(self._linear_solver, self._interface)
-            _s('symbolic_fact')
-            self._symbolic_done = True
 
         _s('update_nlp')
 

@@ -1,0 +1,37 @@
+# Binder-only environment (used by mybinder.org / in-page execution).
+#
+# Deliberately trimmed relative to the top-level environment.yml so the
+# repo2docker image builds quickly and stays under mybinder.org's size/time
+# limits. Differences from the dev env:
+#   - no mpi4py: Binder is single-node, so MPI examples can't parallelize there.
+#   - conda-forge only (no `defaults` channel) to avoid solver/ToS issues.
+#   - installs the package non-editably (`.`), which is more robust on Binder
+#     than `-e .`.
+# Realistic in-page targets are the small ODE notebooks (Leslie-Gower, fed-batch);
+# the four-tank DAE and MPI examples are too heavy for Binder's resources.
+name: sindae-binder
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - cyipopt>=1.4          # IPOPT+MUMPS; needed by decomp / GBM-simultaneous / inference
+  - pyomo>=6.7            # from conda-forge: bundles the compiled PyNumero ASL
+                          # interface (pynumero_ASL). The PyPI/pip wheel does NOT,
+                          # so the GBM/decomp solves fail with "Cannot load the
+                          # PyNumero ASL interface" when pyomo is pip-installed.
+  - pip
+  - pip:
+      - jax[cpu]>=0.4.30
+      - jaxlib>=0.4.30
+      - equinox>=0.11
+      - optax>=0.2
+      - pounce-solver>=0.4
+      - feral-solver>=0.9
+      - numpy>=1.24
+      - scipy>=1.10
+      - matplotlib>=3.7
+      - pandas>=2.0         # the fed-batch notebook loads measurements via pandas
+# NOTE: the sindae package itself is installed in binder/postBuild, NOT here.
+# `pip install .` inside a conda environment.yml is unreliable on repo2docker
+# (the pip subsection's working directory is not guaranteed to be the repo root,
+# which makes `.` fail with "Neither 'setup.py' nor 'pyproject.toml' found").

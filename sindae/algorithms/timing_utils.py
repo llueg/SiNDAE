@@ -1,30 +1,41 @@
 """
 timing_utils.py
 
-Utilities for extracting IPOPT internal timing from solver log files.
+Utilities for extracting IPOPT/POUNCE internal timing from solver output.
 
-IPOPT always prints two summary lines at the end of its run:
+Both solvers print summary lines at the end of a run, e.g.
 
-    Total seconds in IPOPT (w/o function evaluations)   =  xx.xxx
-    Total seconds in NLP function evaluations           =  xx.xxx
+    Number of Iterations....: 12
+    Total seconds in IPOPT (w/o function evaluations)   =  xx.xxx   (IPOPT)
+    Total seconds in NLP function evaluations           =  xx.xxx   (IPOPT)
+    Total seconds in POUNCE                             =  xx.xxx   (POUNCE)
 
-These appear in both the standard output stream and in any ``output_file``
-set via solver options.  Using ``output_file`` is the most reliable way to
-capture them programmatically regardless of the ``tee`` setting.
+These appear on the solver's standard output.  The POUNCE ASL executable
+ignores IPOPT's ``output_file`` option, so the reliable capture is stdout
+itself: the ASL solve path passes ``logfile=`` to ``solver.solve`` (pyomo
+writes the subprocess stdout to that file regardless of ``tee``), while
+cyipopt runs in-process and IPOPT honours ``output_file`` there (see
+``set_output_file``).
 
 API
 ---
   tmp_log_path() -> str
-      Return a fresh temp-file path suitable for ``output_file``.
+      Return a fresh temp-file path suitable for capturing a solver log.
 
-  parse_ipopt_log(path) -> dict
-      Parse ``ipopt_only``, ``nlp_evals`` timing (seconds) and ``n_iter``
-      from a log.  Returns None for any value that is not found (e.g. solve
-      did not complete, or a very old IPOPT version).
+  parse_pounce_output(lines) -> dict
+      Parse ``pounceonly``, ``nlp_evals`` timing (seconds), ``n_iter`` and
+      ``last_lgrg`` from solver output (a string or an iterable of lines).
+      Returns None for any value that is not found (e.g. solve did not
+      complete, or the backend does not print that line).
 
-  capture_ipopt_timing(solver, is_cyipopt=False) -> (path, cleanup)
-      Context-manager-free helper: sets output_file on the solver and
-      returns the log path.  Caller must call cleanup() after parsing.
+  parse_pounce_log(path) -> dict
+      Same, reading the output from a log file (a missing/unreadable file
+      yields all-None values).
+
+  set_output_file(solver, path, is_cyipopt=False) -> None
+      Set ``output_file`` / ``print_timing_statistics`` on a solver that
+      honours them (IPOPT/cyipopt; the POUNCE executable ignores
+      ``output_file``).
 """
 from __future__ import annotations
 
@@ -47,61 +58,86 @@ _ITER_RE = re.compile(
 
 
 def tmp_log_path() -> str:
-    """Return a new temp file path (not yet written to) for IPOPT log output."""
-    fd, path = tempfile.mkstemp(suffix='.log', prefix='ipopt_')
+    """Return a new temp file path (not yet written to) for solver log output."""
+    fd, path = tempfile.mkstemp(suffix='.log', prefix='pounce')
     os.close(fd)
     return path
 
 
-def parse_ipopt_log(path: str) -> dict:
+def parse_pounce_output(lines) -> dict:
     """
-    Parse IPOPT internal timing and iteration count from a log file.
+    Parse IPOPT/POUNCE internal timing and iteration count from solver output.
+
+    Parameters
+    ----------
+    lines : str or iterable of str
+        The solver output — a multi-line string or an iterable of lines.
 
     Returns
     -------
     dict with keys:
-      'ipopt_only' : float or None  — seconds in IPOPT excluding NLP evals
+      'pounceonly' : float or None  — seconds in the solver (IPOPT reports
+                     this excluding NLP evals; POUNCE reports the total)
       'nlp_evals'  : float or None  — seconds in NLP function evaluations
-      'n_iter'     : int or None    — number of IPOPT iterations
+                     (IPOPT only; POUNCE does not print this line)
+      'n_iter'     : int or None    — iteration count, from the summary line
+                     or, when that is absent, the last iteration-table row
+      'last_lgrg'  : str or None    — lg(rg) at the last iteration ('-' when
+                     no inertia regularization was applied)
     """
-    ipopt_only: Optional[float] = None
+    if isinstance(lines, str):
+        lines = lines.splitlines()
+
+    pounceonly: Optional[float] = None
     nlp_evals:  Optional[float] = None
     n_iter:     Optional[int]   = None
     last_lgrg:  Optional[str]   = None   # lg(rg) value at the last iteration
+    table_iter: Optional[int]   = None   # last iter number in the table
 
-    try:
-        with open(path) as f:
-            for line in f:
-                m = re.search(
-                    r'Total (?:seconds|CPU secs) in IPOPT[^=]*=\s*([\d.]+)',
-                    line,
-                )
-                if m:
-                    ipopt_only = float(m.group(1))
+    for line in lines:
+        m = re.search(
+            r'Total (?:seconds|CPU secs) in (?:IPOPT|POUNCE)[^=]*=\s*([\d.]+)',
+            line,
+        )
+        if m:
+            pounceonly = float(m.group(1))
 
-                m = re.search(
-                    r'Total (?:seconds|CPU secs) in NLP function evaluations\s*=\s*([\d.]+)',
-                    line,
-                )
-                if m:
-                    nlp_evals = float(m.group(1))
+        m = re.search(
+            r'Total (?:seconds|CPU secs) in NLP function evaluations\s*=\s*([\d.]+)',
+            line,
+        )
+        if m:
+            nlp_evals = float(m.group(1))
 
-                m = re.search(r'Number of Iterations\.+:\s*(\d+)', line)
-                if m:
-                    n_iter = int(m.group(1))
+        m = re.search(r'Number of Iterations\.+:\s*(\d+)', line)
+        if m:
+            n_iter = int(m.group(1))
 
-                m = _ITER_RE.match(line)
-                if m:
-                    last_lgrg = m.group(2)
-    except OSError:
-        pass
+        m = _ITER_RE.match(line)
+        if m:
+            table_iter = int(m.group(1))
+            last_lgrg = m.group(2)
+
+    if n_iter is None:
+        n_iter = table_iter
 
     return {
-        'ipopt_only': ipopt_only,
+        'pounceonly': pounceonly,
         'nlp_evals':  nlp_evals,
         'n_iter':     n_iter,
         'last_lgrg':  last_lgrg,
     }
+
+
+def parse_pounce_log(path: str) -> dict:
+    """Parse solver timing/iteration info from a log file (see
+    ``parse_pounce_output``).  A missing or unreadable file yields the
+    all-None dict."""
+    try:
+        with open(path) as f:
+            return parse_pounce_output(f)
+    except OSError:
+        return parse_pounce_output(())
 
 
 def set_output_file(solver, path: str, is_cyipopt: bool = False) -> None:
@@ -109,7 +145,11 @@ def set_output_file(solver, path: str, is_cyipopt: bool = False) -> None:
 
     ``print_timing_statistics=yes`` is required for IPOPT to emit the
     ``Total seconds in IPOPT`` / ``Total seconds in NLP function evaluations``
-    lines that ``parse_ipopt_log`` looks for.
+    lines that ``parse_pounce_log`` looks for.
+
+    Only effective for solvers that honour ``output_file`` (IPOPT/cyipopt);
+    the POUNCE ASL executable ignores it, so the ASL solve path captures the
+    solver's stdout via pyomo's ``logfile=`` mechanism instead.
     """
     if is_cyipopt:
         solver.config.options['output_file'] = path

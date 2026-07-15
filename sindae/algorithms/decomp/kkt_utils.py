@@ -22,7 +22,10 @@ Constants
 ---------
   NN_CONSTR_NAME, NN_SLACK_POS_NAME, NN_SLACK_NEG_NAME
 """
+from __future__ import annotations
+
 import functools
+from typing import TYPE_CHECKING
 
 import jax
 import jax.numpy as jnp
@@ -31,8 +34,15 @@ import numpy as np
 import pyomo.environ as pyo
 from pyomo.contrib.interior_point.interface import InteriorPointInterface
 from pyomo.contrib.interior_point.linalg.ma27_interface import InteriorPointMA27Interface
+from pyomo.contrib.interior_point.linalg.scipy_interface import ScipyInterface
 from pyomo.contrib.pynumero.linalg.base import LinearSolverStatus
 from pyomo.common.timing import HierarchicalTimer
+
+if TYPE_CHECKING:
+    # Only needed for type annotations: importing FeralInterface imports the
+    # feral wheel at module scope, which must stay an optional dependency
+    # (see the lazy import in solvers.make_linear_solver).
+    from sindae.interfaces.feral_interface import FeralInterface
 
 
 NN_CONSTR_NAME    = 'nn_constraints'
@@ -94,7 +104,7 @@ def make_summed_mixed_vjp_fn(mixed_vjp_fn):
 # Linear solver helpers
 # ---------------------------------------------------------------------------
 
-def init_linear_solver(linear_solver: InteriorPointMA27Interface,
+def init_linear_solver(linear_solver: FeralInterface | InteriorPointMA27Interface | ScipyInterface,
                        interface: InteriorPointInterface):
     kkt_matrix = interface.evaluate_primal_dual_kkt_matrix()
     res = linear_solver.do_symbolic_factorization(kkt_matrix)
@@ -237,6 +247,12 @@ def v_eval_del_obj_del_param(interface, linear_solver, param,
         if timer is not None:
             timer.stop(name)
 
+    def _solve_failed(reason):
+        print('Warning: ' + reason)
+        diag = {'model_vjp_norm': 0.0, 'mixed_vjp_norm': 0.0,
+                'v_bar_z_norm': 0.0, 'v_bar_x_norm': 0.0, 'solve_failed': True}
+        return np.zeros_like(param), diag
+
     _t('kkt_matrix')
     kkt   = interface.evaluate_primal_dual_kkt_matrix()
     n_rho = kkt.shape[0]
@@ -253,18 +269,34 @@ def v_eval_del_obj_del_param(interface, linear_solver, param,
     _s('del_obj_del_rho')
 
     _t('numeric_fact')
-    linear_solver.do_numeric_factorization(kkt)
+    # The KKT sparsity pattern is not invariant across training steps: the
+    # Hessian-of-Lagrangian and the bound-barrier diagonal gain and lose
+    # structural nonzeros as the iterate moves.  Refresh the symbolic
+    # factorization on the current matrix before every numeric factorization;
+    # otherwise MA27 reuses a stale analyse ordering and falsely reports the
+    # (genuinely nonsingular) matrix as singular ("return code: 3").  FERAL and
+    # scipy re-derive their symbolic step inside each numeric call, so this is a
+    # no-op for them.
+    sym_res = linear_solver.do_symbolic_factorization(kkt)
+    if sym_res.status != LinearSolverStatus.successful:
+        _s('numeric_fact')
+        raise RuntimeError(
+            'Symbolic factorization failed with status: ' + str(sym_res.status)
+        )
+    num_res = linear_solver.do_numeric_factorization(kkt, raise_on_error=False)
     _s('numeric_fact')
 
+    if num_res.status != LinearSolverStatus.successful:
+        return _solve_failed(
+            'numeric factorization failed with status: ' + str(num_res.status)
+        )
+
     _t('back_solve')
-    v_bar, status = linear_solver.do_back_solve(del_obj_del_rho)
+    v_bar, status = linear_solver.do_back_solve(del_obj_del_rho, raise_on_error=False)
     _s('back_solve')
 
     if status.status != LinearSolverStatus.successful:
-        print('Warning: back solve failed with status: ' + str(status.status))
-        diag = {'model_vjp_norm': 0.0, 'mixed_vjp_norm': 0.0,
-                'v_bar_z_norm': 0.0, 'v_bar_x_norm': 0.0, 'solve_failed': True}
-        return np.zeros_like(param), diag
+        return _solve_failed('back solve failed with status: ' + str(status.status))
 
     v_bar_input_components = v_bar[input_indices]
     z_constr_indices_in_vbar = (nn_constr_indices

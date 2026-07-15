@@ -27,6 +27,7 @@ import numpy as np
 import pyomo.environ as pyo
 
 from sindae.problem import ProblemDefinition
+from sindae.solvers import make_nlp_solver
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +166,8 @@ def generate_data(
     obs_every: int = 1,
     seed: int = 0,
     noise_std: Optional[np.ndarray] = None,
-    ipopt_options: Optional[dict] = None,
+    pounce_options: Optional[dict] = None,
+    backend: str = 'pounce',
     tee: bool = False,
 ) -> InstanceData:
     """
@@ -173,10 +175,10 @@ def generate_data(
 
     Builds a Pyomo model using problem.build_trajectory +
     problem.add_true_output_constraints + problem.discretize, solves with
-    IPOPT, then:
+    POUNCE, then:
       - Sets problem.obs_times  (subsampled collocation times)
       - Sets problem.obs_values (noisy observations of get_obs_vars)
-      - Returns (x_true, z_true) at all collocation points
+      - Returns the true trajectories as an InstanceData
 
     Parameters
     ----------
@@ -189,15 +191,19 @@ def generate_data(
         1 = observe at all collocation points (default).
     seed        : int
         RNG seed for reproducible noise.
-    ipopt_options : dict, optional
-        Extra IPOPT options, e.g. {'tol': 1e-9}.
+    pounce_options : dict, optional
+        Extra NLP solver options, e.g. {'tol': 1e-9}.
+    backend     : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
+        NLP solver backend used for the true-model solve.
     tee         : bool
-        Pass through to IPOPT solver (print output if True).
+        Pass through to the NLP solver (print output if True).
 
     Returns
     -------
-    x_true : List[np.ndarray]  shape (n_pts, input_dim)  per trajectory
-    z_true : List[np.ndarray]  shape (n_pts, output_dim) per trajectory
+    InstanceData
+        True trajectories at all collocation points (nn_input, nn_output, obs,
+        and aux_vars per trajectory). Returns ``None`` if the POUNCE solve fails
+        or does not reach optimality.
     """
     rng = np.random.default_rng(seed)
     obs_dim = problem.obs_dim
@@ -221,21 +227,18 @@ def generate_data(
     m.obj = pyo.Objective(expr=0.0)
 
     # ── Solve ─────────────────────────────────────────────────────────────────
-    ipopt = pyo.SolverFactory('ipopt')
-    if ipopt_options:
-        for k, v in ipopt_options.items():
-            ipopt.options[k] = v
+    solver = make_nlp_solver(backend, pounce_options)
     try:
-        result = ipopt.solve(m, tee=tee)
+        result = solver.solve(m, tee=tee).result
     except Exception as e:
-        logger.warning(f"generate_data: IPOPT failed with error: {e}")
+        logger.warning(f"generate_data: solve failed with error: {e}")
         return None
     logger.info(
         f"generate_data: {result.solver.status} / "
         f"{result.solver.termination_condition}"
     )
     if result.solver.termination_condition != pyo.TerminationCondition.optimal:
-        logger.warning("generate_data: IPOPT did not solve to optimality; "
+        logger.warning("generate_data: solve did not reach optimality; "
                        "results may be unreliable.")
         return None
 

@@ -4,7 +4,7 @@ inference.py
 Embed a trained MLP into a new problem as a hard GBM constraint and solve.
 
 No data-fit objective.  When ``slack_coef=0`` (default) the NN equality is
-enforced as a hard GBM output constraint — the system is square and IPOPT
+enforced as a hard GBM output constraint — the system is square and POUNCE
 finds the unique feasible trajectory.
 
 When ``slack_coef > 0`` the constraint is relaxed via ℓ₁ slack variables
@@ -25,19 +25,18 @@ API
       -> ConcreteModel
 
   solve_inference(problem, mlp, data, traj_indices=None,
-                  slack_coef=0.0, cyipopt_options=None, tee=False)
+                  slack_coef=0.0, solver_options=None, backend='pounce', tee=False)
       -> ConcreteModel
 """
 from __future__ import annotations
 
 import logging
-import os
 from typing import List, Optional
 
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
 
-from sindae.algorithms.timing_utils import tmp_log_path, parse_ipopt_log, set_output_file
+from sindae.solvers import make_nlp_solver
 from pyomo.contrib.pynumero.interfaces.external_grey_box import ExternalGreyBoxBlock
 
 from sindae.data_utils import InstanceData
@@ -198,7 +197,8 @@ def solve_inference(
     data: InstanceData,
     traj_indices: Optional[List[int]] = None,
     slack_coef: float = 0.0,
-    cyipopt_options: Optional[dict] = None,
+    solver_options: Optional[dict] = None,
+    backend: str = 'pounce',
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
 ) -> pyo.ConcreteModel:
@@ -212,7 +212,10 @@ def solve_inference(
     data            : InstanceData  (from training, for norm stats)
     traj_indices    : List[int], optional  (default: all trajectories)
     slack_coef      : float  (0 = hard constraint; > 0 = ℓ₁-relaxed)
-    cyipopt_options : dict, optional  e.g. ``{'max_iter': 500, 'tol': 1e-8}``
+    solver_options  : dict, optional  e.g. ``{'max_iter': 500, 'tol': 1e-8}``
+        Passed to the selected NLP backend.
+    backend         : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``
+        select alternative grey-box-capable backends)
     tee             : bool
 
     Returns
@@ -235,21 +238,15 @@ def solve_inference(
 
     logger.info("=== Solving inference model ===")
 
-    solver = pyo.SolverFactory('cyipopt')
-    if cyipopt_options:
-        for k, v in cyipopt_options.items():
-            solver.config.options[k] = v
-    _log = tmp_log_path()
-    set_output_file(solver, _log, is_cyipopt=True)
+    solver = make_nlp_solver(backend, solver_options)
 
     timer.start('solve')
-    result = solver.solve(m, tee=tee)
+    res = solver.solve(m, tee=tee)
     timer.stop('solve')
 
-    m._solver_result = result
-    m._ipopt_timing  = parse_ipopt_log(_log)
-    os.unlink(_log)
+    m._solver_result = res.result
+    m._pounce_timing = res.timing
     logger.info(
-        f"  Inference: {result.solver.status} / {result.solver.termination_condition}"
+        f"  Inference: {res.result.solver.status} / {res.result.solver.termination_condition}"
     )
     return m
