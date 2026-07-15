@@ -12,9 +12,9 @@ nonsingular) matrix as singular:
     RuntimeError: Numeric factorization was not successful; return code: 3
 
 FERAL and scipy re-derive their symbolic step inside every numeric call, so they
-never exhibited the failure; MA27 did.  These tests pin the contract with a
-solver-agnostic spy (runs on the pip-only stack) and reproduce the real numeric
-failure with MA27 when it is available.
+never exhibited the failure; MA27 did.  The test here pins the contract with a
+solver-agnostic spy (runs on the pip-only stack), catching a stale-reuse
+regression regardless of which linear solver is installed.
 """
 import numpy as np
 import scipy.sparse as sp

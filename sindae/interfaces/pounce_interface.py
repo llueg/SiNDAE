@@ -28,6 +28,7 @@ API
 """
 from __future__ import annotations
 
+import io
 import sys
 from typing import Optional
 
@@ -42,6 +43,8 @@ from pyomo.contrib.pynumero.interfaces.pyomo_nlp import PyomoNLP
 from pyomo.contrib.pynumero.interfaces.pyomo_grey_box_nlp import (
     PyomoNLPWithGreyBoxBlocks,
 )
+
+from sindae.algorithms.timing_utils import parse_pounce_output
 
 # POUNCE returns the Ipopt ApplicationReturnStatus enum string directly in
 # info['status_msg'] (unlike cyipopt, which returns the long description).
@@ -199,8 +202,11 @@ def solve_pyomo_with_pounce(
     -------
     (results, nlp_or_None, timing)
         ``results`` is a pyomo ``SolverResults``; ``nlp`` is the populated NLP
-        when ``return_nlp`` else None; ``timing`` mirrors ``parse_pounce_log``'s
-        keys (``n_iter`` is filled from POUNCE's iteration count).
+        when ``return_nlp`` else None; ``timing`` mirrors
+        ``parse_pounce_output``'s keys — ``pounceonly`` / ``nlp_evals`` /
+        ``n_iter`` come from POUNCE's info dict, ``last_lgrg`` is parsed from
+        the captured iteration log ('-' when no inertia regularization was
+        applied at the last iteration).
     """
     import pounce
 
@@ -226,7 +232,13 @@ def solve_pyomo_with_pounce(
         prob.add_option(key, value)
 
     timer = TicTocTimer()
-    with capture_output(sys.stdout if tee else None, capture_fd=True):
+    # POUNCE prints its iteration table through the C-level stdout, so
+    # capture_fd is required to grab it into ``solver_log`` (the lg(rg)
+    # column is parsed below); tee=True additionally streams to the console.
+    solver_log = io.StringIO()
+    with capture_output(
+        [solver_log, sys.stdout] if tee else solver_log, capture_fd=True
+    ):
         x, info = prob.solve(x0=nlp.init_primals())
     wall_time = timer.toc(None)
 
@@ -261,11 +273,19 @@ def solve_pyomo_with_pounce(
     results.solver.termination_condition = tc
     results.solver.status = TerminationCondition.to_solver_status(tc)
 
+    # POUNCE's info dict carries structured timing; the lg(rg) column only
+    # appears in the printed iteration table, so parse it from the captured
+    # log (None when POUNCE printed no table rows).
+    parsed = parse_pounce_output(solver_log.getvalue())
+    pounce_timing = info.get("timing") or {}
+    n_iter = info.get("iter_count")
+    if n_iter is None:
+        n_iter = parsed["n_iter"]
     timing = {
-        "pounceonly": None,
-        "nlp_evals": None,
-        "n_iter": info.get("iter_count"),
-        "last_lgrg": None,
+        "pounceonly": pounce_timing.get("overall_alg"),
+        "nlp_evals": pounce_timing.get("function_evaluations_total"),
+        "n_iter": n_iter,
+        "last_lgrg": parsed["last_lgrg"],
     }
 
     return results, (nlp if return_nlp else None), timing

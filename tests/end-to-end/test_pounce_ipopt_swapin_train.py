@@ -67,8 +67,16 @@ _SOLVER_STYLES = {
     ('pounce', 'limited-memory'): {'color': 'C1', 'ls': '--', 'lw': 1.5, 'alpha': 0.7},
 }
 
+
+def _solver_available(name: str) -> bool:
+    try:
+        return bool(pyo.SolverFactory(name).available(exception_flag=False))
+    except Exception:
+        return False
+
+
 @dataclass
-class TestConfig:
+class TrainConfig:
     # Problem init
     problem: FourTankProblem | LeslieGowerProblem | FedBatchBioreactorProblem
     # MLP init
@@ -87,7 +95,7 @@ class TestConfig:
 
 
 class Configs(Enum):
-    four_tank = TestConfig(
+    four_tank = TrainConfig(
         # Problem init
         problem=FourTankProblem(
             nfe=40, 
@@ -114,7 +122,7 @@ class Configs(Enum):
         batch_size = 32,
     )
 
-    leslie_gower = TestConfig(
+    leslie_gower = TrainConfig(
         # Problem init
         problem=LeslieGowerProblem(
             nfe=60, 
@@ -141,7 +149,7 @@ class Configs(Enum):
         batch_size = 32,
     )
 
-    fedbatch = TestConfig(
+    fedbatch = TrainConfig(
         # Problem init
         problem=FedBatchBioreactorProblem(
             nfe=40, 
@@ -183,7 +191,7 @@ def _obj_and_tc(m) -> tuple:
 
 
 def solve_simultaneous_with(
-    config: TestConfig,
+    config: TrainConfig,
     solver_name: str,
     use_gbm: bool,
     hess_approx: str
@@ -326,6 +334,10 @@ def _save_comparison_plots(config_name, plot_results):
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(not _solver_available('ipopt'),
+                    reason='ipopt binary not on PATH')
+@pytest.mark.skipif(not _solver_available('pounce'),
+                    reason='pounce binary not on PATH')
 # Test case to solve all three problems with ipopt/pounce and check results match.
 def test_pounce_matches_ipopt_simultaneous():
     """

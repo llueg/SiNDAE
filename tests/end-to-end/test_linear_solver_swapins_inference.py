@@ -8,10 +8,10 @@ with different ICs and compare the inferred trajectories (x) and NN outputs
 (z) across the linear solvers.
 
 The linear solver only enters training through the implicit-differentiation
-KKT back-solve (the hypergradient); the NLP subproblems are always solved by
-cyipopt and inference always uses cyipopt, so any difference between branches
-traces back to round-off in the gradients amplified over the optax training
-loop.  Tolerances are therefore looser than the pounce/ipopt NLP-solver test:
+KKT back-solve (the hypergradient); the NLP subproblems and inference always
+use the default POUNCE backend, so any difference between branches traces
+back to round-off in the gradients amplified over the optax training loop.
+Tolerances are therefore looser than the pounce/ipopt NLP-solver test:
 this measures optimisation-path divergence, not a single solve's accuracy.
 """
 from __future__ import annotations
@@ -279,9 +279,8 @@ def _save_comparison_plot(results: dict, truth=None) -> None:
 # ── Test ──────────────────────────────────────────────────────────────────────
 @pytest.mark.slow
 @pytest.mark.skipif(not _solver_available('pounce'),
-                    reason='pounce binary required for data gen / smoother')
-@pytest.mark.skipif(not _solver_available('cyipopt'),
-                    reason='cyipopt required for decomp subproblems and inference')
+                    reason='pounce binary required (data gen / smoother / '
+                           'decomp subproblems / inference)')
 def test_linear_solver_inference():
     """
     Train via decomp with each available KKT linear solver, infer on

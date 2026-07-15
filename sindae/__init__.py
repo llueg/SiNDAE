@@ -26,5 +26,10 @@ from sindae.algorithms.inference import make_inference_model as make_inference_m
 from sindae.algorithms.inference import solve_inference as solve_inference
 from sindae.plot_utils import plot_instance_data, plot_training_history
 from sindae.example_problems import FourTankProblem, LeslieGowerProblem, FedBatchBioreactorProblem
-from importlib.metadata import version
-__version__ = version("sindae")
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("sindae")
+except PackageNotFoundError:
+    # Plain source checkout without an installed distribution.
+    __version__ = "0.0.0+unknown"

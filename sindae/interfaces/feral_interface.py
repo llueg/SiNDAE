@@ -55,6 +55,7 @@ class FeralInterface(IPLinearSolverInterface):
         iterative_refinement: bool = True,
         max_steps: Optional[int] = None,
         refine_tol: float = 1e-12,
+        residual_tol: float = 1e-4,
     ):
         """
         Parameters
@@ -75,6 +76,19 @@ class FeralInterface(IPLinearSolverInterface):
             ``||r|| <= refine_tol * (1 + ||b||)``. A non-positive value
             disables the early exit, so the loop always runs ``max_steps``
             steps.
+        residual_tol
+            Acceptance threshold on the final relative residual
+            ``||b - A x|| / max(||b||, tiny)`` in ``do_back_solve``. feral
+            factors some numerically rank-deficient matrices with
+            ``FactorStatus.SUCCESS`` and a clean (zero-free) inertia, yet
+            back-solves them to garbage; a non-finite or above-threshold
+            residual therefore flags the solve as failed
+            (``LinearSolverStatus.error``) instead of returning it as
+            successful. Refined residuals scale roughly with
+            ``cond(A) * machine_eps``, so the default ``1e-4`` tolerates
+            legitimately solvable systems up to conditioning ~1e13 while
+            garbage solves sit at O(1). A non-positive value disables the
+            check.
         """
         self._solver = feral.Solver()
         self._csc: Optional[feral.CscMatrix] = None   # last factorized matrix
@@ -83,6 +97,7 @@ class FeralInterface(IPLinearSolverInterface):
         self._iterative_refinement = iterative_refinement
         self._max_steps = max_steps
         self._refine_tol = refine_tol
+        self._residual_tol = residual_tol
         # Number of refinement steps the manual loop ran in the last
         # do_back_solve; None when the loop was not used (solve_refined path).
         self.last_refine_steps: Optional[int] = None
@@ -133,13 +148,27 @@ class FeralInterface(IPLinearSolverInterface):
             res.status = LinearSolverStatus.error
             return res
 
-        self._csc = a
-        self._matrix = a_scipy  # for residuals in the manual refinement loop
-        self._inertia = inertia.as_tuple()  # (n_pos, n_neg, n_zero)
+        # feral factors some singular matrices with FactorStatus.SUCCESS and
+        # records the rank deficiency only in the certified inertia (e.g. a
+        # zero matrix factors "successfully" with inertia (0, 0, n)), so a
+        # nonzero zero-eigenvalue count is treated as singular here.
+        n_pos, n_neg, n_zero = inertia.as_tuple()
 
-        if status == feral.FactorStatus.SUCCESS:
+        if status == feral.FactorStatus.SUCCESS and n_zero == 0:
+            self._csc = a
+            self._matrix = a_scipy  # for residuals in do_back_solve
+            self._inertia = (n_pos, n_neg, n_zero)
             res.status = LinearSolverStatus.successful
-        elif status == feral.FactorStatus.SINGULAR:
+            return res
+
+        # Not successful: clear the factorization state so a subsequent
+        # do_back_solve fails its guard instead of reusing stale factors.
+        self._csc = None
+        self._matrix = None
+        self._inertia = None
+        if status == feral.FactorStatus.SINGULAR or (
+            status == feral.FactorStatus.SUCCESS and n_zero > 0
+        ):
             if raise_on_error:
                 raise RuntimeError('feral: matrix is singular')
             res.status = LinearSolverStatus.singular
@@ -178,6 +207,24 @@ class FeralInterface(IPLinearSolverInterface):
                 raise
             self.logger.error('feral back solve raised: %s', err)
             return None, LinearSolverResults(LinearSolverStatus.error)
+
+        if self._residual_tol > 0.0:
+            # Guard against inaccurate solves feral does not flag itself:
+            # numerically rank-deficient matrices can factor with a clean
+            # status and inertia but back-solve to garbage (see __init__).
+            rel_residual = np.linalg.norm(_rhs - self._matrix @ result) / max(
+                np.linalg.norm(_rhs), np.finfo(np.float64).tiny
+            )
+            if not np.isfinite(rel_residual) or rel_residual > self._residual_tol:
+                msg = (
+                    'feral back solve failed the residual check: relative '
+                    f'residual {rel_residual:g} exceeds residual_tol '
+                    f'{self._residual_tol:g}'
+                )
+                if raise_on_error:
+                    raise RuntimeError(msg)
+                self.logger.error(msg)
+                return None, LinearSolverResults(LinearSolverStatus.error)
 
         if isinstance(rhs, BlockVector):
             _result = rhs.copy_structure()
