@@ -24,7 +24,7 @@ from typing import List, Optional, Tuple
 import pyomo.environ as pyo
 from pyomo.common.timing import HierarchicalTimer
 
-from sindae.solvers import make_nlp_solver
+from sindae.solvers import CyIpoptSolver, PounceSolver, make_nlp_solver
 
 from sindae.data_utils import InstanceData
 from sindae.nn_utils import SimpleMLP
@@ -104,6 +104,18 @@ def solve_simultaneous(
     use_gbm  = cfg.use_gbm
     reg_coef = cfg.reg_coef
 
+    # ── Resolve solver backend (before the expensive model build) ──────────────
+    solver = make_nlp_solver(nlp_solver or 'pounce', solver_options)
+    if use_gbm and not isinstance(solver, (PounceSolver, CyIpoptSolver)):
+        # Grey-box (ExternalGreyBoxBlock) callbacks cannot be written to NL
+        # files, so ASL backends like 'ipopt' fail there — reject early rather
+        # than surfacing an opaque NL-writer error after the build.
+        raise ValueError(
+            f"NLP backend {solver.name!r} cannot solve grey-box "
+            f"(ExternalGreyBoxBlock) models; with use_gbm=True choose a "
+            f"grey-box-capable backend: 'pounce' (default) or 'cyipopt'"
+        )
+
     # ── Build model ────────────────────────────────────────────────────────────
     timer.start('build')
     try:
@@ -139,7 +151,6 @@ def solve_simultaneous(
             # (POUNCE default; cyipopt selectable) and L-BFGS — the GBM supplies
             # no Hessian.  POUNCE forces limited-memory itself; cyipopt needs it
             # passed in, so set it for both.
-            solver = make_nlp_solver(nlp_solver or 'pounce', solver_options)
             logger.info(
                 f"=== Solving simultaneous GBM model ({solver.name}, L-BFGS) ==="
             )
@@ -148,7 +159,6 @@ def solve_simultaneous(
                 extra_options={'hessian_approximation': 'limited-memory'},
             )
         else:
-            solver = make_nlp_solver(nlp_solver or 'pounce', solver_options)
             logger.info(
                 f"=== Solving simultaneous model ({solver.name}, expr-writing) ==="
             )

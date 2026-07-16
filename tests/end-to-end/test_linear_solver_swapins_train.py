@@ -64,7 +64,7 @@ _SOLVER_STYLES = {
 
 
 @dataclass
-class TestConfig:
+class TrainConfig:
     problem_cls:     type
     problem_kwargs:  dict
     mlp_kwargs:      dict
@@ -79,7 +79,7 @@ class TestConfig:
 
 
 class Configs(Enum):
-    four_tank = TestConfig(
+    four_tank = TrainConfig(
         problem_cls    = FourTankProblem,
         problem_kwargs = dict(nfe=40, ncp=3),
         mlp_kwargs     = dict(in_size=4, out_size=2, widths=[32, 32],
@@ -101,7 +101,7 @@ class Configs(Enum):
         solver_options = {},
     )
 
-    leslie_gower = TestConfig(
+    leslie_gower = TrainConfig(
         problem_cls    = LeslieGowerProblem,
         problem_kwargs = dict(nfe=60, ncp=3),
         mlp_kwargs     = dict(in_size=2, out_size=1, widths=[16, 16],
@@ -119,7 +119,7 @@ class Configs(Enum):
         solver_options = dict(tol=1e-6, max_iter=300),
     )
 
-    fedbatch = TestConfig(
+    fedbatch = TrainConfig(
         problem_cls    = FedBatchBioreactorProblem,
         problem_kwargs = dict(nfe=40, ncp=3),
         mlp_kwargs     = dict(in_size=4, out_size=1, widths=[20, 20],
@@ -142,7 +142,7 @@ def relative_rmse(ref, other):
     return float(np.sqrt(np.mean((ref - other) ** 2)) / (np.sqrt(np.mean(ref ** 2)) + 1e-8))
 
 
-def run_decomp_with_solver(cfg: TestConfig, solver_name: str) -> InstanceData:
+def run_decomp_with_solver(cfg: TrainConfig, solver_name: str) -> InstanceData:
     problem = cfg.problem_cls(**cfg.problem_kwargs)
     mlp = SimpleMLP(**cfg.mlp_kwargs, key=jax.random.PRNGKey(cfg.seed))
 
@@ -267,7 +267,11 @@ def _format_rmse_table(rows: list, ref_name: str) -> str:
 
 @pytest.mark.slow
 def test_linear_solver_swapins():
-    solver_names = ['ma27', 'scipy', 'feral']
+    solver_names = ['scipy']
+    if MA27_AVAILABLE:
+        solver_names = ['ma27'] + solver_names
+    if FERAL_AVAILABLE:
+        solver_names.append('feral')
     ref_name = 'ma27' if MA27_AVAILABLE else 'scipy'
 
     table_rows = []   # (config_name, solver_name, z_rmse, x_rmse)

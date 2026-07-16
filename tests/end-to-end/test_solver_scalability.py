@@ -271,9 +271,8 @@ def test_scalability_pounce_vs_ipopt():
 
 @pytest.mark.slow
 @pytest.mark.skipif(not _solver_available('pounce'),
-                    reason='pounce binary required for data gen / smoother')
-@pytest.mark.skipif(not _solver_available('cyipopt'),
-                    reason='cyipopt required for decomp subproblems')
+                    reason='pounce binary required (data gen / smoother / '
+                           'decomp subproblems)')
 def test_scalability_linear_solvers():
     """
     Time the decomp (KKT-gradient) training with each available linear solver

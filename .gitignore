@@ -22,3 +22,6 @@ dev/
 
 # MyST build outputs
 _build
+
+# macOS Finder metadata
+.DS_Store

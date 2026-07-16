@@ -28,6 +28,7 @@ string facade on top of them.
 from __future__ import annotations
 
 import abc
+import logging
 import os
 from dataclasses import dataclass, field, fields
 from typing import Optional, Union
@@ -39,6 +40,8 @@ from sindae.algorithms.timing_utils import (
     set_output_file,
     tmp_log_path,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -82,10 +85,12 @@ class NLPResult:
         The object returned by ``solver.solve`` (carries
         ``solver.termination_condition`` etc.).
     timing : dict
-        Parsed IPOPT timing/iteration info (see ``parse_pounce_log``).
+        Parsed solver timing/iteration info — IPOPT or POUNCE branded output
+        (see ``parse_pounce_output``); values are None when the backend does
+        not print the corresponding line.
     nlp : object or None
-        The populated NLP returned by ``return_nlp=True`` (cyipopt only);
-        ``None`` otherwise.
+        The populated NLP returned by ``return_nlp=True`` (cyipopt, or
+        POUNCE on grey-box models); ``None`` otherwise.
     """
 
     result: object
@@ -104,9 +109,10 @@ class NLPSolver(abc.ABC):
     """
 
     #: cyipopt sets options on ``solver.config.options``; ASL solvers on
-    #: ``solver.options``.  Also selects the ``set_output_file`` code path.
+    #: ``solver.options``.  Also selects the log-capture code path.
     is_cyipopt: bool = False
-    #: Only cyipopt can return the populated NLP from ``solve(return_nlp=True)``.
+    #: Whether ``solve(return_nlp=True)`` can return the populated NLP
+    #: (cyipopt always; POUNCE for grey-box models only).
     supports_return_nlp: bool = False
 
     @property
@@ -137,7 +143,13 @@ class NLPSolver(abc.ABC):
         extra_options: Optional[dict] = None,
         return_nlp: bool = False,
     ) -> NLPResult:
-        """Solve ``model``, capturing IPOPT timing from a temporary log file.
+        """Solve ``model``, capturing solver timing from its log output.
+
+        The ASL executables do not all honour IPOPT's ``output_file`` option
+        (POUNCE ignores it), so on the ASL path the subprocess stdout is
+        captured to a temporary file via pyomo's ``logfile=`` mechanism
+        (``tee=True`` still streams to the console).  cyipopt runs in-process
+        and IPOPT itself writes the log via ``output_file``.
 
         Parameters
         ----------
@@ -145,25 +157,40 @@ class NLPSolver(abc.ABC):
         tee : bool
             Stream solver output to stdout.
         extra_options : dict, optional
-            Per-call options merged onto the persistent solver before solving.
+            Per-call options overlaid on the persistent solver options for
+            this solve only (the persistent options are left untouched).
         return_nlp : bool
-            Return the populated NLP alongside the results (cyipopt only;
-            raises ``ValueError`` for backends that do not support it).
+            Return the populated NLP alongside the results (raises
+            ``ValueError`` for backends that do not support it).
         """
         if return_nlp and not self.supports_return_nlp:
             raise ValueError(
                 f"NLP backend {self.name!r} does not support return_nlp=True"
             )
-        if extra_options:
-            self._apply_options(extra_options)
 
         log_path = tmp_log_path()
-        set_output_file(self._solver, log_path, is_cyipopt=self.is_cyipopt)
+        # The ``options`` kwarg is ephemeral in pyomo — overlaid on the
+        # persistent options for this call only (OptSolver restores them;
+        # cyipopt builds a per-call config) — so extra_options cannot leak
+        # into later solves.
+        solve_kwargs = {"tee": tee}
+        if self.is_cyipopt:
+            set_output_file(self._solver, log_path, is_cyipopt=True)
+            if extra_options:
+                solve_kwargs["options"] = dict(extra_options)
+        else:
+            solve_kwargs["logfile"] = log_path
+            solve_kwargs["options"] = {
+                "print_timing_statistics": "yes",
+                **(extra_options or {}),
+            }
         try:
             if return_nlp:
-                result, nlp = self._solver.solve(model, tee=tee, return_nlp=True)
+                result, nlp = self._solver.solve(
+                    model, return_nlp=True, **solve_kwargs
+                )
             else:
-                result = self._solver.solve(model, tee=tee)
+                result = self._solver.solve(model, **solve_kwargs)
                 nlp = None
             timing = parse_pounce_log(log_path)
         finally:
@@ -252,12 +279,20 @@ def make_nlp_solver(
 
     ``backend`` may be a name (``"pounce"`` (default), ``"ipopt"``,
     ``"cyipopt"``; case-insensitive) or an existing :class:`NLPSolver`, which is
-    returned unchanged.  ``options`` may be a plain option dict or a
+    returned unchanged (``options`` are ignored in that case — a warning is
+    logged if any were passed).  ``options`` may be a plain option dict or a
     :class:`SolverConfig`.
     """
     if isinstance(options, SolverConfig):
         options = options.to_dict()
     if isinstance(backend, NLPSolver):
+        if options:
+            logger.warning(
+                "make_nlp_solver: backend is an already-constructed %s "
+                "instance; ignoring options %s",
+                type(backend).__name__,
+                sorted(options),
+            )
         return backend
     try:
         cls = _NLP_BACKENDS[backend.lower()]
@@ -275,10 +310,19 @@ def make_linear_solver(name: Union[str, object] = "feral", **kwargs):
 
     ``name`` may be ``"feral"`` (default), ``"ma27"``, ``"scipy"``
     (case-insensitive) or an already-constructed interface, which is returned
-    unchanged.  Extra keyword arguments are forwarded to the constructor (used
-    by FERAL's ``max_steps`` / ``refine_tol``).
+    unchanged (keyword arguments are ignored in that case — a warning is
+    logged if any were passed).  Extra keyword arguments are forwarded to the
+    constructor (used by FERAL's ``max_steps`` / ``refine_tol`` /
+    ``residual_tol``).
     """
     if not isinstance(name, str):
+        if kwargs:
+            logger.warning(
+                "make_linear_solver: name is an already-constructed %s "
+                "instance; ignoring keyword arguments %s",
+                type(name).__name__,
+                sorted(kwargs),
+            )
         return name
 
     key = name.lower()
