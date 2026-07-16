@@ -5,14 +5,17 @@
 ### `PretrainConfig`
 
 ```python
-class PretrainConfig(epochs: int = 400, batch_size: int = 32, reg_coef: float = 0.1)
+class PretrainConfig(epochs: int = 200, batch_size: int = 32, reg_coef: float = 0.1)
 ```
 
 Hyperparameters for supervised MLP pretraining on smoother arrays.
 
+``epochs=0`` runs no pretraining passes (the MLP is returned unchanged),
+which is how ``HybridDAE`` users opt out of the pretraining stage.
+
 **Fields**
 
-- **`epochs`** (`int`, default `400`)
+- **`epochs`** (`int`, default `200`)
 - **`batch_size`** (`int`, default `32`)
 - **`reg_coef`** (`float`, default `0.1`)
 

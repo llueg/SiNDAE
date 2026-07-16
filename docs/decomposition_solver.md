@@ -5,7 +5,7 @@ from the DAE solve. It alternates between:
 
 1. **Inner step:** fix $\boldsymbol{\theta}$ and solve the per-scenario DAE NLP with a
    Grey-Box Model (GBM) of the network, by default through POUNCE's grey-box
-   interface (`backend='cyipopt'` selects cyipopt instead).
+   interface (`nlp_solver='cyipopt'` selects cyipopt instead).
 2. **Outer step:** compute $\nabla_{\boldsymbol{\theta}} \Phi$ by **implicit differentiation of the
    inner KKT conditions** and take an Adam step on $\boldsymbol{\theta}$.
 
@@ -54,13 +54,17 @@ network terms enter through vector-Jacobian products evaluated by automatic diff
 FERAL is the default; pass `linear_solver='ma27'` or `linear_solver='scipy'` to `train_decomp`
 to select an alternative (see [](api/solvers.md)).
 
-The inner NLP is solved with POUNCE by default (`backend='pounce'`; `'cyipopt'` or `'ipopt'`
+The inner NLP is solved with POUNCE by default (`nlp_solver='pounce'`; `'cyipopt'` or `'ipopt'`
 are selectable). For POUNCE the decomposition defaults `mu_strategy='adaptive'`, which
 converges robustly on the cold inner solves; pass your own `solver_options` to override it.
 
 ---
 
 ## Usage
+
+The high-level wrapper drives this method with
+[`HybridDAE(method="decomposition", ...)`](api/hybrid_dae.md); the stage-level
+calls are:
 
 ```python
 from sindae.algorithms.pretrain import PretrainConfig, pretrain_mlp

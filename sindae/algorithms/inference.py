@@ -25,7 +25,7 @@ API
       -> ConcreteModel
 
   solve_inference(problem, mlp, data, traj_indices=None,
-                  slack_coef=0.0, solver_options=None, backend='pounce', tee=False)
+                  slack_coef=0.0, solver_options=None, nlp_solver='pounce', tee=False)
       -> ConcreteModel
 """
 from __future__ import annotations
@@ -198,7 +198,7 @@ def solve_inference(
     traj_indices: Optional[List[int]] = None,
     slack_coef: float = 0.0,
     solver_options: Optional[dict] = None,
-    backend: str = 'pounce',
+    nlp_solver: str = 'pounce',
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
 ) -> pyo.ConcreteModel:
@@ -214,7 +214,7 @@ def solve_inference(
     slack_coef      : float  (0 = hard constraint; > 0 = ℓ₁-relaxed)
     solver_options  : dict, optional  e.g. ``{'max_iter': 500, 'tol': 1e-8}``
         Passed to the selected NLP backend.
-    backend         : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``
+    nlp_solver      : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``
         select alternative grey-box-capable backends)
     tee             : bool
 
@@ -238,7 +238,7 @@ def solve_inference(
 
     logger.info("=== Solving inference model ===")
 
-    solver = make_nlp_solver(backend, solver_options)
+    solver = make_nlp_solver(nlp_solver, solver_options)
 
     timer.start('solve')
     res = solver.solve(m, tee=tee)

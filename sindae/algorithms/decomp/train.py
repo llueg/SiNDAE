@@ -114,8 +114,9 @@ def train_decomp(
     smoother_model: Optional[pyo.ConcreteModel] = None,
     mpi_comm=None,
     solver_options: Optional[dict] = None,
-    backend: str = 'pounce',
+    nlp_solver: str = 'pounce',
     linear_solver: str = 'feral',
+    unfix_io: bool = True,
 ) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]:
     """
     Train a neural network via the decomposition (GBM + KKT gradient) approach.
@@ -137,10 +138,13 @@ def train_decomp(
     mpi_comm        : mpi4py.MPI.Comm, optional
     solver_options  : dict, optional
         Options passed to the NLP backend, e.g. ``{'max_iter': 200, 'tol': 1e-6}``.
-    backend         : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``)
+    nlp_solver      : str  (default ``'pounce'``; ``'cyipopt'`` / ``'ipopt'``)
         NLP solver for the inner grey-box solve.  Must be grey-box-capable.
     linear_solver   : str  (default ``'feral'``; ``'ma27'`` / ``'scipy'``)
         KKT/linear solver for the decomposition gradient back-solve.
+    unfix_io        : bool  (default True)
+        Unfix the NN input/output variables in the decomposition model.
+        Set False for partially observed problems.
 
     Returns
     -------
@@ -198,6 +202,7 @@ def train_decomp(
         data=data,
         slack_coef=cfg.init_slack_coef,
         smoother_model=smoother_model,
+        unfix_io=unfix_io,
     )
 
     obj_fn = make_batch_obj_fn(m)
@@ -213,7 +218,7 @@ def train_decomp(
         slack_coef=cfg.init_slack_coef,
         subsample_frac=cfg.subsample_frac,
         solver_options=solver_options,
-        backend=backend,
+        nlp_solver=nlp_solver,
         linear_solver=linear_solver,
     )
 

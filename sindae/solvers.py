@@ -30,7 +30,7 @@ from __future__ import annotations
 import abc
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 from typing import Optional, Union
 
 import pyomo.environ as pyo
@@ -42,6 +42,37 @@ from sindae.algorithms.timing_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SolverConfig:
+    """Typed options for an NLP backend.
+
+    Named fields cover the common IPOPT-family options; anything else goes in
+    ``extra_options`` (a plain option-name -> value dict).  Fields left as
+    ``None`` are omitted, so the backend's own defaults apply.  On a name
+    collision the named field wins over ``extra_options``.
+
+    Accepted anywhere solver options are taken: ``HybridDAE(solver_options=)``
+    requires it, and :func:`make_nlp_solver` / the stage functions accept it
+    interchangeably with a plain dict.
+    """
+
+    tol: Optional[float] = None
+    max_iter: Optional[int] = None
+    mu_strategy: Optional[str] = None
+    hessian_approximation: Optional[str] = None
+    print_level: Optional[int] = None
+    extra_options: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Merge set named fields over ``extra_options`` into one options dict."""
+        named = {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if f.name != "extra_options" and getattr(self, f.name) is not None
+        }
+        return {**self.extra_options, **named}
 
 
 @dataclass
@@ -242,15 +273,18 @@ _NLP_BACKENDS = {
 
 def make_nlp_solver(
     backend: Union[str, NLPSolver] = "pounce",
-    options: Optional[dict] = None,
+    options: Union[dict, SolverConfig, None] = None,
 ) -> NLPSolver:
     """Build an :class:`NLPSolver` for ``backend``.
 
     ``backend`` may be a name (``"pounce"`` (default), ``"ipopt"``,
     ``"cyipopt"``; case-insensitive) or an existing :class:`NLPSolver`, which is
     returned unchanged (``options`` are ignored in that case — a warning is
-    logged if any were passed).
+    logged if any were passed).  ``options`` may be a plain option dict or a
+    :class:`SolverConfig`.
     """
+    if isinstance(options, SolverConfig):
+        options = options.to_dict()
     if isinstance(backend, NLPSolver):
         if options:
             logger.warning(

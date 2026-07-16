@@ -46,6 +46,17 @@ and `cyipopt`, an optional alternative NLP backend (POUNCE is the default for ev
 solve). Their wheels depend on your platform; if either fails to build from pip, use
 the conda route below for those two packages.
 
+### Model export (optional)
+
+```bash
+pip install "sindae[onnx]"    # HybridDAE.export to ONNX (+ a scaler sidecar) or JSON
+pip install "sindae[omlt]"    # HybridDAE.to_omlt for an in-memory OMLT model
+```
+
+These extras are only needed to hand a trained network to a foreign optimization
+tool. The core pipeline never imports them, and `HybridDAE.export(..., format="json")`
+needs no extra at all. See the `HybridDAE` API page for usage.
+
 ## Install with conda (alternative)
 
 conda-forge ships pre-built binaries for the dependencies that are awkward to build
@@ -72,6 +83,8 @@ pip install sindae
 | `feral-solver` | core | Sparse symmetric KKT solver for the decomposition gradient |
 | `cyipopt` | `[full]` | Optional alternative NLP backend (IPOPT with MUMPS); POUNCE is the default |
 | `mpi4py` | `[full]` | MPI parallelism for multi-trajectory decomposition training |
+| `jax2onnx`, `onnxruntime` | `[onnx]` | Export a trained network to ONNX (`HybridDAE.export`) |
+| `omlt` | `[omlt]` | Export a trained network as an OMLT model (`HybridDAE.to_omlt`) |
 
 ## GPU and accelerator support (optional)
 

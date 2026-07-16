@@ -11,14 +11,17 @@ computed directly from problem.obs_values.
 
 API
 ---
+  SmootherConfig — hyperparameters for the smoother stage
+
   build_smoother_model(problem, mlp, traj_indices, smooth_coef=1.0) -> ConcreteModel
 
   solve_smoother(problem, mlp, traj_indices=None, smooth_coef=1.0,
-                 pounce_options=None) -> ConcreteModel
+                 solver_options=None, nlp_solver='pounce') -> ConcreteModel
 """
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import List, Optional
 
 import pyomo.environ as pyo
@@ -39,6 +42,18 @@ from sindae.algorithms.model_builder_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SmootherConfig:
+    """Hyperparameters for the smoother stage (used by ``HybridDAE``).
+
+    ``smooth_coef`` weights the smoothness penalty
+    ``smooth_coef * mean((dz_smooth/dt)^2)`` against the data fit; larger
+    values give smoother warm-start trajectories.
+    """
+
+    smooth_coef: float = 1.0
 
 
 def build_smoother_model(
@@ -66,6 +81,9 @@ def build_smoother_model(
     traj_indices : List[int]
     smooth_coef  : float
         Weight on smoothness penalty: ``smooth_coef * mean((dz_smooth/dt)^2)``.
+    unfix_io     : bool  (default True)
+        Unfix the NN input/output variables; set False for partially observed
+        problems (see ``solve_smoother``).
 
     Returns
     -------
@@ -143,8 +161,8 @@ def solve_smoother(
     mlp: SimpleMLP,
     traj_indices: Optional[List[int]] = None,
     smooth_coef: float = 1.0,
-    pounce_options: Optional[dict] = None,
-    backend: str = 'pounce',
+    solver_options: Optional[dict] = None,
+    nlp_solver: str = 'pounce',
     timer: Optional[HierarchicalTimer] = None,
     unfix_io: bool = True,
 ) -> pyo.ConcreteModel:
@@ -157,9 +175,15 @@ def solve_smoother(
     mlp            : SimpleMLP          (used for out_size only)
     traj_indices   : List[int], optional  (default: all trajectories)
     smooth_coef    : float
-    pounce_options : dict, optional  (e.g. ``{'tol': 1e-6, 'max_iter': 500}``)
-    backend        : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
+    solver_options : dict or SolverConfig, optional
+        Options for the NLP solver, e.g. ``{'tol': 1e-6, 'max_iter': 500}``.
+    nlp_solver     : str  (default ``'pounce'``; ``'ipopt'`` / ``'cyipopt'``)
         NLP solver backend.
+    unfix_io       : bool  (default True)
+        Unfix the NN input/output variables so the smoother can move them off
+        the data.  Set False for partially observed problems: unmeasured
+        states have no data anchor, and leaving their variables free makes
+        the solve diverge.
 
     Returns
     -------
@@ -183,7 +207,7 @@ def solve_smoother(
                              )
     timer.stop('build')
 
-    solver = make_nlp_solver(backend, pounce_options)
+    solver = make_nlp_solver(nlp_solver, solver_options)
 
     timer.start('solve')
     res = solver.solve(m, tee=False)

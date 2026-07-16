@@ -27,7 +27,7 @@ Build an inference NLP: DAE + trained NN embedded as a GBM constraint.
 ### `solve_inference`
 
 ```python
-solve_inference(problem: ProblemDefinition, mlp: SimpleMLP, data: InstanceData, traj_indices: Optional[List[int]] = None, slack_coef: float = 0.0, solver_options: Optional[dict] = None, backend: str = 'pounce', tee: bool = False, timer: Optional[HierarchicalTimer] = None) -> pyo.ConcreteModel
+solve_inference(problem: ProblemDefinition, mlp: SimpleMLP, data: InstanceData, traj_indices: Optional[List[int]] = None, slack_coef: float = 0.0, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', tee: bool = False, timer: Optional[HierarchicalTimer] = None) -> pyo.ConcreteModel
 ```
 
 Build and solve the inference NLP, returning the solved model.
@@ -40,7 +40,7 @@ Build and solve the inference NLP, returning the solved model.
 - **`traj_indices`** (`Optional[List[int]]`, default `None`)
 - **`slack_coef`** (`float`, default `0.0`)
 - **`solver_options`** (`Optional[dict]`, default `None`) — Passed to the selected NLP backend.
-- **`backend`** (`str`, default `'pounce'`) — select alternative grey-box-capable backends)
+- **`nlp_solver`** (`str`, default `'pounce'`) — select alternative grey-box-capable backends)
 - **`tee`** (`bool`, default `False`)
 - **`timer`** (`Optional[HierarchicalTimer]`, default `None`)
 

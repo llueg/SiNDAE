@@ -89,6 +89,29 @@ load_from_file(filename: str) -> InstanceData
 - `InstanceData`
 
 
+(sindae.data_utils.NormStats)=
+### `NormStats`
+
+```python
+class NormStats(input_mean: np.ndarray, input_std: np.ndarray, output_mean: np.ndarray, output_std: np.ndarray)
+```
+
+The four normalization vectors ``solve_inference`` consumes.
+
+An :class:`InstanceData` exposes the same four attributes as properties;
+``NormStats`` is the lightweight stand-in restored by ``HybridDAE.load``,
+which persists the scaler but not the full training trajectories.  Anywhere
+an ``InstanceData`` is used only for normalization statistics (e.g.
+``make_inference_model``), a ``NormStats`` is a drop-in replacement.
+
+**Fields**
+
+- **`input_mean`** (`np.ndarray`)
+- **`input_std`** (`np.ndarray`)
+- **`output_mean`** (`np.ndarray`)
+- **`output_std`** (`np.ndarray`)
+
+
 (sindae.data_utils.extract_instance_data)=
 ### `extract_instance_data`
 
@@ -116,7 +139,7 @@ Iterates over ``model.traj_set``, calling ``problem.get_input_vars``,
 ### `generate_data`
 
 ```python
-generate_data(problem: ProblemDefinition, obs_every: int = 1, seed: int = 0, noise_std: Optional[np.ndarray] = None, pounce_options: Optional[dict] = None, backend: str = 'pounce', tee: bool = False) -> InstanceData
+generate_data(problem: ProblemDefinition, obs_every: int = 1, seed: int = 0, noise_std: Optional[np.ndarray] = None, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', tee: bool = False) -> InstanceData
 ```
 
 Solve the true model for all trajectories and populate problem with data.
@@ -134,8 +157,8 @@ POUNCE, then:
 - **`obs_every`** (`int`, default `1`) — Keep every N-th collocation time point as an observation. 1 = observe at all collocation points (default).
 - **`seed`** (`int`, default `0`) — RNG seed for reproducible noise.
 - **`noise_std`** (`Optional[np.ndarray]`, default `None`) — Std of Gaussian noise added to observations (0 = noiseless).
-- **`pounce_options`** (`Optional[dict]`, default `None`) — Extra NLP solver options, e.g. {'tol': 1e-9}.
-- **`backend`** (`str`, default `'pounce'`) — NLP solver backend used for the true-model solve.
+- **`solver_options`** (`Optional[dict]`, default `None`) — Extra NLP solver options, e.g. {'tol': 1e-9}.
+- **`nlp_solver`** (`str`, default `'pounce'`) — NLP solver backend used for the true-model solve.
 - **`tee`** (`bool`, default `False`) — Pass through to the NLP solver (print output if True).
 
 **Returns**

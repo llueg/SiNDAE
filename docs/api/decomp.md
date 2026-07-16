@@ -26,7 +26,7 @@ trained_m, mlp, history = train_decomp(
     problem, mlp, cfg,
     data=smoother_data,              # normalization statistics
     smoother_model=smoother_m,       # reuse the discretized smoother
-    solver_options={'tol': 1e-6, 'max_iter': 300},   # backend='pounce' by default
+    solver_options={'tol': 1e-6, 'max_iter': 300},   # nlp_solver='pounce' by default
 )
 trained_data = extract_instance_data(problem, trained_m)
 # history['data_fit_history'], history['grad_norm_history'], ... for diagnostics

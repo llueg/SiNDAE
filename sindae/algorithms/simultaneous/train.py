@@ -51,8 +51,8 @@ def solve_simultaneous(
     cfg: SimultaneousConfig,
     data: InstanceData,
     smoother_model: Optional[pyo.ConcreteModel] = None,
-    pounce_options: Optional[dict] = None,
-    backend: Optional[str] = None,
+    solver_options: Optional[dict] = None,
+    nlp_solver: Optional[str] = None,
     traj_indices: Optional[List[int]] = None,
     tee: bool = False,
     timer: Optional[HierarchicalTimer] = None,
@@ -73,11 +73,11 @@ def solve_simultaneous(
     smoother_model : pyo.ConcreteModel, optional
         Solved smoother model to reuse (warm-starts the simultaneous solve
         and avoids rebuilding / re-discretising the model).
-    pounce_options : dict, optional
+    solver_options : dict or SolverConfig, optional
         Extra solver options, e.g. ``{'max_iter': 500, 'tol': 1e-6,
-        'hessian_approximation': 'limited-memory'}``.  Passed to POUNCE
-        (expression-writing) or cyipopt (GBM) depending on ``cfg.use_gbm``.
-    backend        : str, optional
+        'hessian_approximation': 'limited-memory'}``.  Passed to the selected
+        NLP backend on either path.
+    nlp_solver     : str, optional
         NLP backend (``'pounce'`` default, ``'ipopt'`` / ``'cyipopt'``).
         Applies to both paths.  When ``cfg.use_gbm`` is True the backend must be
         grey-box-capable (POUNCE / cyipopt); ``'ipopt'`` is rejected there.
@@ -86,8 +86,10 @@ def solve_simultaneous(
         Stream solver output to stdout.
     timer          : HierarchicalTimer, optional
         Reuse an external timer; a fresh one is created when omitted.
-    unfix_io       : bool
-        Unfix the NN input/output variables before solving (default True).
+    unfix_io       : bool  (default True)
+        Unfix the NN input/output variables before solving.  Set False for
+        partially observed problems: unmeasured states have no data anchor,
+        and leaving their variables free makes the solve diverge.
 
     Returns
     -------
@@ -103,7 +105,7 @@ def solve_simultaneous(
     reg_coef = cfg.reg_coef
 
     # ── Resolve solver backend (before the expensive model build) ──────────────
-    solver = make_nlp_solver(backend or 'pounce', pounce_options)
+    solver = make_nlp_solver(nlp_solver or 'pounce', solver_options)
     if use_gbm and not isinstance(solver, (PounceSolver, CyIpoptSolver)):
         # Grey-box (ExternalGreyBoxBlock) callbacks cannot be written to NL
         # files, so ASL backends like 'ipopt' fail there — reject early rather

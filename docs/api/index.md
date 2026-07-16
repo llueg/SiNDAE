@@ -5,6 +5,7 @@ All public symbols are importable directly from `sindae`:
 ```python
 import sindae
 
+sindae.HybridDAE
 sindae.SimpleMLP
 sindae.ProblemDefinition
 sindae.InstanceData
@@ -21,6 +22,7 @@ sindae.train_decomp          # via sindae.algorithms.decomp.train
 
 | Module | Key symbols |
 |--------|-------------|
+| [hybrid_dae](hybrid_dae.md) | `HybridDAE` |
 | [problem](problem.md) | `ProblemDefinition` |
 | [data_utils](data_utils.md) | `TrajectoryData`, `InstanceData`, `extract_instance_data`, `generate_data` |
 | [nn_utils](nn_utils.md) | `SimpleMLP`, `flatten_fn`, `make_unflatten_fn` |

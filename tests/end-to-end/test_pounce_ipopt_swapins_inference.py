@@ -191,8 +191,8 @@ def train_simultaneous_with(cfg: TrainConfig, solver_name: str, hess_approx: str
         problem=problem, mlp=mlp,
         cfg=simul_cfg,
         data=smoother_data, smoother_model=smoother_m,
-        pounce_options={'hessian_approximation': hess_approx},
-        backend=solver_name,
+        solver_options={'hessian_approximation': hess_approx},
+        nlp_solver=solver_name,
         tee=False,
     )
 

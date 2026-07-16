@@ -198,7 +198,7 @@ def solve_simultaneous_with(
 ) -> tuple:
     """
     Solve single config with the specified NLP backend, selected via the public
-    ``solve_simultaneous(backend=...)`` argument.
+    ``solve_simultaneous(nlp_solver=...)`` argument.
 
     Returns
     -------
@@ -261,7 +261,7 @@ def solve_simultaneous_with(
     # ── 4. Solve simultaneously with the selected backend ───────────────────────
     logger.info(f'  4. Solving simultaneously with {solver_name}...')
 
-    pounce_options = {'hessian_approximation': hess_approx}
+    solver_options = {'hessian_approximation': hess_approx}
 
     # Select the NLP backend via the public API (no monkeypatching).
     try:
@@ -271,8 +271,8 @@ def solve_simultaneous_with(
             cfg=SimultaneousConfig(use_gbm=use_gbm, reg_coef=config.reg_coef),
             data=smoother_data,
             smoother_model=smoother_m,
-            pounce_options=pounce_options,
-            backend=solver_name,
+            solver_options=solver_options,
+            nlp_solver=solver_name,
             tee=False,
         )
     except Exception as e:

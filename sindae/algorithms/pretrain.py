@@ -23,8 +23,12 @@ from sindae.nn_utils import SimpleMLP, train_eqx_mlp
 
 @dataclass
 class PretrainConfig:
-    """Hyperparameters for supervised MLP pretraining on smoother arrays."""
-    epochs:     int   = 400
+    """Hyperparameters for supervised MLP pretraining on smoother arrays.
+
+    ``epochs=0`` runs no pretraining passes (the MLP is returned unchanged),
+    which is how ``HybridDAE`` users opt out of the pretraining stage.
+    """
+    epochs:     int   = 200
     batch_size: int   = 32
     reg_coef:   float = 1e-1
 

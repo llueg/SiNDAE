@@ -37,12 +37,16 @@ from griffe import Parser
 # the sindae package. This mirrors what the old autodoc directives documented.
 # --------------------------------------------------------------------------- #
 MANIFEST: dict[str, list[str]] = {
+    "hybrid_dae": [
+        "hybrid_dae.HybridDAE",
+    ],
     "problem": [
         "problem.ProblemDefinition",
     ],
     "data_utils": [
         "data_utils.TrajectoryData",
         "data_utils.InstanceData",
+        "data_utils.NormStats",
         "data_utils.extract_instance_data",
         "data_utils.generate_data",
     ],
@@ -56,6 +60,7 @@ MANIFEST: dict[str, list[str]] = {
         "algorithms.pretrain.pretrain_mlp",
     ],
     "smoother": [
+        "algorithms.smoother.SmootherConfig",
         "algorithms.smoother.build_smoother_model",
         "algorithms.smoother.solve_smoother",
     ],
@@ -76,6 +81,7 @@ MANIFEST: dict[str, list[str]] = {
         "algorithms.inference.solve_inference",
     ],
     "solvers": [
+        "solvers.SolverConfig",
         "solvers.make_nlp_solver",
         "solvers.make_linear_solver",
         "solvers.NLPSolver",

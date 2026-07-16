@@ -40,7 +40,7 @@ from pyomo.common.timing import HierarchicalTimer
 
 import sindae.algorithms.decomp.kkt_utils as dutils
 from sindae.algorithms.model_builder_utils import NORM_INPUT_NAME, NORM_OBS_NAME
-from sindae.solvers import make_linear_solver, make_nlp_solver
+from sindae.solvers import SolverConfig, make_linear_solver, make_nlp_solver
 from sindae.interfaces.interior_point_compat import InteriorPointInterface
 from sindae.interfaces.pyomo_grey_box_nlp_extended import PyomoNLPWithGreyBoxBlocksExtended
 
@@ -74,7 +74,7 @@ class TrajectoryBatchSubproblem:
     slack_coef : float
     param_reg_coef : float
     subsample_frac : float
-    backend : str or NLPSolver
+    nlp_solver : str or NLPSolver
         NLP solver for the inner grey-box solve ('pounce' default; 'cyipopt' /
         'ipopt' select alternatives).  The KKT gradient needs the populated NLP,
         so the backend must be grey-box-capable (POUNCE / cyipopt).
@@ -95,7 +95,7 @@ class TrajectoryBatchSubproblem:
         slack_coef=1.0,
         subsample_frac=1.0,
         solver_options=None,
-        backend='pounce',
+        nlp_solver='pounce',
         linear_solver='feral',
     ):
         self._model         = model
@@ -115,10 +115,12 @@ class TrajectoryBatchSubproblem:
         # DAE inner NLP; the adaptive strategy converges robustly and matches
         # the cyipopt reference.  Default it in for POUNCE only (cyipopt/ipopt
         # keep their defaults); a user-supplied mu_strategy always wins.
+        if isinstance(solver_options, SolverConfig):
+            solver_options = solver_options.to_dict()
         opts = dict(solver_options or {})
-        if isinstance(backend, str) and backend.lower() == 'pounce':
+        if isinstance(nlp_solver, str) and nlp_solver.lower() == 'pounce':
             opts.setdefault('mu_strategy', 'adaptive')
-        self._nlp_solver    = make_nlp_solver(backend, opts)
+        self._nlp_solver    = make_nlp_solver(nlp_solver, opts)
         self._linear_solver = make_linear_solver(linear_solver)
 
         self._extended_nlp = None
