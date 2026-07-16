@@ -250,6 +250,7 @@ def test_fit_pretrains_by_default_and_warns_on_non_optimal(monkeypatch):
 
     monkeypatch.setattr(hd, "solve_smoother", lambda *a, **k: _Model())
     monkeypatch.setattr(hd, "extract_instance_data", lambda *a, **k: "data")
+    monkeypatch.setattr(hd, "_capture_io_names", lambda *a, **k: None)
     monkeypatch.setattr(hd, "pretrain_mlp", fake_pretrain)
     monkeypatch.setattr(hd, "solve_simultaneous", lambda *a, **k: (_Model(), mlp))
 
@@ -288,6 +289,7 @@ def _fake_fitted(mlp=None):
     model._net = mlp
     model.smoother_data = InstanceData([traj])
     model.termination = "optimal"
+    model.io_names = {"inputs": ["x[0]", "x[1]"], "outputs": ["z"]}
     return model
 
 
@@ -389,6 +391,214 @@ def test_save_load_predict_matches_original(tmp_path):
                         solver_options=SolverConfig(tol=1e-6))
     np.testing.assert_allclose(got[0].nn_output, ref[0].nn_output,
                                rtol=1e-6, atol=1e-8)
+
+
+# ---------------------------------------------------------------------------
+# Export: OMLT / ONNX / JSON (leaving SiNDAE for a foreign optimization tool)
+# ---------------------------------------------------------------------------
+
+import importlib.util
+
+
+def _have(mod):
+    return importlib.util.find_spec(mod) is not None
+
+
+needs_omlt = pytest.mark.skipif(not _have("omlt"), reason="omlt not installed")
+needs_onnx = pytest.mark.skipif(
+    not (_have("jax2onnx") and _have("onnxruntime")),
+    reason="jax2onnx / onnxruntime not installed",
+)
+
+
+def test_export_requires_fitted():
+    from sindae import HybridDAE
+
+    with pytest.raises(RuntimeError, match="fit"):
+        HybridDAE(net=_mlp()).export(format="json")
+
+
+def test_export_unknown_format_raises(tmp_path):
+    model = _fake_fitted()
+    with pytest.raises(ValueError, match="format"):
+        model.export(tmp_path / "m.weird")
+    with pytest.raises(ValueError, match="format"):
+        model.export()  # no path, no format
+
+
+def test_export_json_carries_weights_scaler_and_io_contract(tmp_path):
+    """The JSON bundle is self-describing: weights, activations, the scaler, the
+    data-derived input bounds, and the ordered IO variable-name contract."""
+    import json
+
+    from sindae.nn_utils import flatten_fn
+
+    model = _fake_fitted()
+    path = tmp_path / "m.json"
+    ret = model.export(path)
+    assert ret == path
+
+    bundle = json.loads(path.read_text())
+
+    # Architecture + activation names (hidden layers only; output is linear).
+    assert bundle["in_size"] == 2 and bundle["out_size"] == 1
+    assert bundle["activations"] == ["softplus", "softplus"]
+
+    # Weights round-trip: rebuilding the flat vector matches the trained net.
+    flat = np.concatenate(
+        [np.asarray(w).ravel() for w in bundle["weights"]]
+        + [np.asarray(b).ravel() for b in bundle["biases"]]
+    )
+    # (order-independent check: same multiset of parameter values)
+    np.testing.assert_allclose(np.sort(flat),
+                               np.sort(np.asarray(flatten_fn(model.net))))
+
+    # Scaler is the four normalization vectors.
+    for attr in ("input_mean", "input_std", "output_mean", "output_std"):
+        np.testing.assert_allclose(
+            np.asarray(bundle["scaler"][attr]),
+            np.asarray(getattr(model.smoother_data, attr)),
+        )
+
+    # IO contract (positional variable names) and data-derived input bounds.
+    assert bundle["io_names"] == {"inputs": ["x[0]", "x[1]"], "outputs": ["z"]}
+    assert len(bundle["input_bounds"]) == 2
+
+
+@needs_onnx
+def test_export_onnx_matches_jax(tmp_path):
+    """The exported ONNX graph reproduces the JAX network under onnxruntime
+    (external oracle), and a scaler sidecar is written alongside it."""
+    import json
+
+    import jax.numpy as jnp
+    import onnxruntime as ort
+
+    model = _fake_fitted()
+    path = tmp_path / "m.onnx"
+    model.export(path)
+
+    assert path.exists()
+    sidecar = tmp_path / "m.onnx.json"
+    assert sidecar.exists()
+    meta = json.loads(sidecar.read_text())
+    assert "scaler" in meta and "io_names" in meta
+    # Default export leaves the graph in normalized space; the scaler is applied
+    # externally by the consumer, so the sidecar advertises that contract.
+    assert meta["scaling"] == "external"
+
+    sess = ort.InferenceSession(str(path))
+    iname = sess.get_inputs()[0].name
+    x = np.array([[1.3, -0.4], [0.2, 0.9], [-1.0, 2.0]])
+    onnx_out = sess.run(None, {iname: x})[0]
+    ref = np.asarray(jax.vmap(model.net)(jnp.array(x)))
+    np.testing.assert_allclose(onnx_out, ref, rtol=1e-6, atol=1e-8)
+
+
+@needs_onnx
+def test_export_onnx_scaled_bakes_scaler(tmp_path):
+    """With scaled=True the ONNX graph consumes RAW physical inputs and returns
+    RAW physical outputs: it reproduces normalize -> net -> denormalize end to
+    end (external oracle), and the sidecar marks the scaling as baked in."""
+    import json
+
+    import jax.numpy as jnp
+    import onnxruntime as ort
+
+    model = _fake_fitted()
+    path = tmp_path / "m_scaled.onnx"
+    ret = model.export(path, scaled=True)
+    assert str(ret) == str(path)
+
+    sidecar = tmp_path / "m_scaled.onnx.json"
+    assert sidecar.exists()
+    meta = json.loads(sidecar.read_text())
+    assert meta["scaling"] == "baked"
+
+    sess = ort.InferenceSession(str(path))
+    iname = sess.get_inputs()[0].name
+    x = np.array([[1.3, -0.4], [0.2, 0.9], [-1.0, 2.0]])
+    onnx_out = sess.run(None, {iname: x})[0]
+
+    sd = model.smoother_data
+    in_mean, in_std = jnp.asarray(sd.input_mean), jnp.asarray(sd.input_std)
+    out_mean, out_std = jnp.asarray(sd.output_mean), jnp.asarray(sd.output_std)
+
+    def physical(v):
+        return out_mean + out_std * model.net((v - in_mean) / in_std)
+
+    ref = np.asarray(jax.vmap(physical)(jnp.array(x)))
+    np.testing.assert_allclose(onnx_out, ref, rtol=1e-6, atol=1e-8)
+
+
+@needs_onnx
+def test_export_onnx_scaled_only_valid_for_onnx(tmp_path):
+    """scaled=True is an ONNX-only knob; it is rejected for json export."""
+    model = _fake_fitted()
+    with pytest.raises(ValueError, match="scaled"):
+        model.export(tmp_path / "m.json", scaled=True)
+
+
+@needs_omlt
+def test_export_omlt_reproduces_normalized_forward():
+    """OMLT NetworkDefinition + OffsetScaling maps raw physical inputs to raw
+    physical outputs, matching the full normalize -> net -> denormalize path.
+
+    External oracle: a Pyomo solve of the OMLT formulation with fixed inputs is
+    compared to the SimpleMLP evaluated through the training normalization.
+    """
+    import jax.numpy as jnp
+    import pyomo.environ as pyo
+    from omlt import OmltBlock
+    from omlt.neuralnet import FullSpaceSmoothNNFormulation
+
+    model = _fake_fitted()
+    net_def = model.to_omlt()
+
+    m = pyo.ConcreteModel()
+    m.nn = OmltBlock()
+    m.nn.build_formulation(FullSpaceSmoothNNFormulation(net_def))
+    x_raw = np.array([0.25, 0.35])
+    m.nn.inputs[0].fix(x_raw[0])
+    m.nn.inputs[1].fix(x_raw[1])
+    m.obj = pyo.Objective(expr=0.0)
+    pyo.SolverFactory("pounce").solve(m)
+    omlt_out = pyo.value(m.nn.outputs[0])
+
+    sd = model.smoother_data
+    xn = (x_raw - np.asarray(sd.input_mean)) / np.asarray(sd.input_std)
+    z = np.asarray(jax.vmap(model.net)(jnp.array(xn[None])))[0]
+    ref = np.asarray(sd.output_mean) + np.asarray(sd.output_std) * z
+    np.testing.assert_allclose(omlt_out, float(ref[0]), rtol=1e-6, atol=1e-8)
+
+
+@needs_asl
+def test_export_omlt_after_fit_and_load_captures_io_names(tmp_path):
+    """A model fit on LeslieGower captures the IO variable-name contract, and it
+    survives a save/load round-trip into the export bundle."""
+    import json
+
+    from sindae import HybridDAE, PretrainConfig, SimultaneousConfig, SolverConfig
+
+    problem = _observed_problem()
+    model = HybridDAE(
+        net=_mlp(),
+        pretrain=PretrainConfig(epochs=5),
+        train=SimultaneousConfig(reg_coef=1e-3),
+        solver_options=SolverConfig(tol=1e-5, max_iter=200),
+    )
+    model.fit(problem)
+    # LeslieGower inputs are x[0], x[1]; output is z.
+    assert model.io_names == {"inputs": ["x[0]", "x[1]"], "outputs": ["z"]}
+
+    save_path = tmp_path / "m.eqx"
+    model.save(save_path)
+    reloaded = HybridDAE.load(save_path)
+    assert reloaded.io_names == model.io_names
+
+    json_path = tmp_path / "m.json"
+    reloaded.export(json_path)
+    assert json.loads(json_path.read_text())["io_names"] == model.io_names
 
 
 # ---------------------------------------------------------------------------

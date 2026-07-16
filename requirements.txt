@@ -7,7 +7,6 @@ jax>=0.4.30
 jaxlib>=0.4.30
 equinox>=0.11
 optax>=0.2
-jax2onnx>=0.14.1
 
 # Pyomo
 pyomo>=6.7
@@ -21,6 +20,11 @@ feral-solver>=0.9
 
 # MPI (for parallel examples)
 mpi4py>=3.1
+
+# Model export for foreign optimization tools (optional; HybridDAE.export/.to_omlt)
+jax2onnx>=0.14.1
+onnxruntime>=1.17
+omlt>=1.2
 
 # Plotting
 matplotlib>=3.7

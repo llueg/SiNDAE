@@ -76,6 +76,12 @@ mu_hat = model.net                     # the trained SimpleMLP
 model.save("mu_hat.eqx")
 reloaded = sd.HybridDAE.load("mu_hat.eqx")
 pred = reloaded.predict(new_problem, slack_coef=1e-5)   # scaler restored
+
+# Export for a foreign optimization tool
+model.export("mu_hat.json")            # plain-text bundle, no extra dependencies
+model.export("mu_hat.onnx")            # ONNX graph (normalized) + scaler sidecar
+model.export("mu_hat.onnx", scaled=True)  # scaler baked in: raw-in, raw-out graph
+net_def = model.to_omlt()              # in-memory OMLT NetworkDefinition
 ```
 
 `save` writes the network weights, its architecture, and the four
@@ -84,6 +90,22 @@ normalization vectors the inference stage needs, so a reloaded model can
 stage configs and training trajectories are not persisted, so `load` is for
 resuming or serving a trained network, not for reproducing the original solve
 bit for bit.
+
+`save`/`load` round-trip back into SiNDAE; `export` and `to_omlt` are a one-way
+handoff to another modeling tool. Both carry the scaler, so the network is
+evaluated in the space it was trained in. `export(path)` writes a file (`.json`
+for a dependency-free bundle of weights, activations, scaler, input bounds, and
+the ordered input/output variable names; `.onnx` for the graph plus a scaler
+sidecar) and needs the matching extra (`pip install 'sindae[onnx]'`).
+`to_omlt()` returns an `omlt.neuralnet.NetworkDefinition` whose inputs and
+outputs are the raw physical variables (the normalization rides along as an
+OMLT `OffsetScaling`), ready to drop into your own optimization model with an
+OMLT formulation; it needs `pip install 'sindae[omlt]'`. The ONNX graph itself
+stays in normalized space by default because OMLT applies the scaler separately;
+pass `export(path, scaled=True)` to bake the scaler into the graph as affine
+layers instead, giving a self-contained model that maps raw physical inputs to
+raw physical outputs in any ONNX runtime (the sidecar's `scaling` field records
+which contract applies, so a consumer never double-applies the scaler).
 
 The smoother stage is configured the same way when its defaults are not right,
 for example `smoother=sd.SmootherConfig(smooth_coef=10.0)` for noisier data.

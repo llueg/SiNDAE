@@ -68,7 +68,6 @@ import equinox as eqx
 import jax
 import json
 import numpy as np
-from jax2onnx import to_onnx
 
 _METHODS = ("simultaneous", "decomposition")
 _NLP_SOLVERS = ("pounce", "ipopt", "cyipopt")
@@ -85,6 +84,46 @@ def _require_config(value, cls, param: str) -> None:
             f"{param}= takes a {cls.__name__} instance or None, "
             f"got {type(value).__name__}"
         )
+
+
+def _capture_io_names(problem: "ProblemDefinition", model) -> dict:
+    """Record the ordered NN input/output variable names from a built model.
+
+    Reads the first trajectory block's variables at its first time point, so the
+    export IO contract survives even after the model is gone (it is persisted by
+    :meth:`HybridDAE.save`).
+    """
+    block0 = model.trajectories[0]
+    t0 = min(block0.t)
+    return {
+        "inputs": _slot_names(problem.get_input_vars(block0, t0)),
+        "outputs": _slot_names(problem.get_output_vars(block0, t0)),
+    }
+
+
+def _slot_names(vars_at_t) -> list:
+    """Human-readable per-slot names for a list of Pyomo Var elements.
+
+    Used to record the export IO contract: the ordered physical meaning of each
+    NN input/output slot, which no NN interchange format carries.  When several
+    slots come from the same component (e.g. ``x[t, 0]`` and ``x[t, 1]`` both
+    belong to ``x``), they are disambiguated positionally (``x[0]``, ``x[1]``);
+    a component contributing a single slot keeps its bare name.
+    """
+    comps = [v.parent_component().local_name for v in vars_at_t]
+    totals: dict = {}
+    for c in comps:
+        totals[c] = totals.get(c, 0) + 1
+    seen: dict = {}
+    names = []
+    for c in comps:
+        if totals[c] > 1:
+            j = seen.get(c, 0)
+            names.append(f"{c}[{j}]")
+            seen[c] = j + 1
+        else:
+            names.append(c)
+    return names
 
 
 class HybridDAE:
@@ -226,6 +265,7 @@ class HybridDAE:
         self.trained_data: Optional[InstanceData] = None
         self.history: Optional[dict] = None
         self.inference_model = None
+        self.io_names: Optional[dict] = None
 
     # ------------------------------------------------------------------
 
@@ -301,6 +341,7 @@ class HybridDAE:
         )
         self._check_solve("smoother", smoother_model)
         smoother_data = extract_instance_data(problem, smoother_model)
+        io_names = _capture_io_names(problem, smoother_model)
 
         pretrain_cfg = self.pretrain if self.pretrain is not None else PretrainConfig()
         mlp = pretrain_mlp(mlp, smoother_data, pretrain_cfg)
@@ -336,6 +377,7 @@ class HybridDAE:
         self.training_model = training_model
         self.trained_data = extract_instance_data(problem, training_model)
         self.history = history
+        self.io_names = io_names
         return self
 
     def predict(
@@ -428,6 +470,7 @@ class HybridDAE:
             },
             "method": self.method,
             "termination": self.termination,
+            "io_names": self.io_names,
         }
         with open(path, "wb") as f:
             f.write((json.dumps(manifest) + "\n").encode())
@@ -487,29 +530,274 @@ class HybridDAE:
             output_std=np.asarray(norm["output_std"]),
         )
         model.termination = manifest["termination"]
+        model.io_names = manifest.get("io_names")
         return model
 
 
-    # TODO: Function to export the NN weights for another modelling software like OMLT (ONNX, or JSON format)
-    def export(self, path="exported_models/", format="ONNX"):
-        """
-        Export the trained NN into ONNX, or json format with the scaler and IO 
-        contract based on the model pyomo model.
-        """
+    def _export_bundle(self) -> dict:
+        """Assemble the format-agnostic export payload from the fitted model.
 
+        Everything a foreign optimization tool needs to embed the trained
+        surrogate: the layer weights/biases, the hidden-layer activation names,
+        the scaler (four normalization vectors), data-derived input bounds (the
+        surrogate's trust region), and the ordered IO variable-name contract.
+        """
         self._check_fitted()
+        net = self._net
+        sd = self.smoother_data
+        input_bounds = None
+        if hasattr(sd, "nn_input"):  # InstanceData (not the loaded NormStats)
+            stacked = np.vstack(sd.nn_input)
+            input_bounds = [
+                (float(lo), float(hi))
+                for lo, hi in zip(stacked.min(axis=0), stacked.max(axis=0))
+            ]
+        return {
+            "in_size": net.in_size,
+            "out_size": net.out_size,
+            "widths": list(net.widths),
+            "weights": [np.asarray(layer.weight) for layer in net.layers],
+            "biases": [np.asarray(layer.bias) for layer in net.layers],
+            "activations": [_act_jax2str(a) for a in net.activations],
+            "scaler": {
+                "input_mean":  np.asarray(sd.input_mean),
+                "input_std":   np.asarray(sd.input_std),
+                "output_mean": np.asarray(sd.output_mean),
+                "output_std":  np.asarray(sd.output_std),
+            },
+            "input_bounds": input_bounds,
+            "io_names": self.io_names,
+        }
 
-        if format=="json":
-            # Fill in with json saving logic
-            pass
-        else:
-            to_onnx(
-                self.net, 
-                [("B", 32)], 
-                enable_double_precision=True,
-                return_mode="file", 
-                output_path="model.onnx"
-                )
+    def export(self, path=None, format: Optional[str] = None,
+               scaled: bool = False) -> str:
+        """Export the trained network to a file for a foreign optimization tool.
+
+        Unlike :meth:`save` (which round-trips back into SiNDAE), ``export`` is a
+        one-way handoff.  Two file targets, both carrying the scaler so the
+        network is evaluated in the space it was trained in:
+
+        * ``'onnx'`` — writes the network graph to ``path`` and a ``<path>.json``
+          sidecar with the scaler, input bounds, and IO contract.  By default
+          (``scaled=False``) the graph is in normalized space and the scaler is
+          kept out of it, because every OMLT loader applies the scaler
+          separately.  With ``scaled=True`` the four normalization vectors are
+          baked into the graph as affine layers, so the exported model consumes
+          raw physical inputs and returns raw physical outputs (self-contained
+          inference in any ONNX runtime, no sidecar arithmetic).  Needs the
+          ``onnx`` extra.
+        * ``'json'`` — writes the whole bundle (weights, activations, scaler,
+          bounds, IO contract) as plain text. Only use for very small MLPs since 
+          storing many weights may lead to large file sizes.
+
+        For an in-memory OMLT model (not a file), use :meth:`to_omlt`.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Output file.  When ``format`` is omitted the target is inferred from
+            the suffix (``.onnx`` / ``.json``).
+        format : str, optional
+            ``'onnx'`` or ``'json'``.  Required when ``path`` has no recognized
+            suffix.
+        scaled : bool, default False
+            ONNX only.  When ``True``, bake the scaler into the exported graph
+            so it maps raw physical inputs to raw physical outputs.  Rejected for
+            ``'json'`` export (whose bundle always carries the scaler verbatim).
+
+        Returns
+        -------
+        str
+            The written path.
+        """
+        self._check_fitted()
+        fmt = format.lower() if format is not None else None
+        if fmt is None and path is not None:
+            suffix = str(path).rsplit(".", 1)[-1].lower() if "." in str(path) else ""
+            fmt = {"onnx": "onnx", "json": "json"}.get(suffix)
+        if fmt not in ("onnx", "json"):
+            raise ValueError(
+                "export needs format='onnx'|'json' (or a path ending in "
+                f"'.onnx'/'.json'); got format={format!r}, path={path!r}. "
+            )
+        if scaled and fmt != "onnx":
+            raise ValueError(
+                "scaled=True is only meaningful for ONNX export; the json "
+                "bundle already carries the scaler verbatim."
+            )
+
+        bundle = self._export_bundle()
+        if fmt == "onnx":
+            return _export_onnx(bundle, self._net, path, scaled=scaled)
+        return _export_json(bundle, path)
+
+    def to_omlt(self):
+        """Build an in-memory OMLT model of the trained network.
+
+        Returns an ``omlt.neuralnet.NetworkDefinition`` with the normalization
+        attached as an ``OffsetScaling`` (so the OMLT block's inputs/outputs are
+        the raw physical variables, not normalized ones) and the data-derived
+        input bounds as its ``scaled_input_bounds``.  Feed it to an OMLT
+        formulation (e.g. ``FullSpaceSmoothNNFormulation``) inside your own
+        optimization model.  Needs the ``omlt`` extra.
+
+        Returns
+        -------
+        omlt.neuralnet.NetworkDefinition
+        """
+        return _export_omlt(self._export_bundle())
+
+
+# --------------------------------------------------------------------------- #
+# Export writers (one bundle -> N encodings).  OMLT / ONNX imports are lazy so
+# the core package installs and imports without those optional dependencies.
+# --------------------------------------------------------------------------- #
+
+def _scaler_to_lists(scaler: dict) -> dict:
+    return {k: np.asarray(v).tolist() for k, v in scaler.items()}
+
+
+def _export_json(bundle: dict, path) -> str:
+    """Write the full bundle as plain-text JSON."""
+    if path is None:
+        raise ValueError("json export needs a path")
+    payload = {
+        "format": "sindae-export",
+        "format_version": 1,
+        "in_size": bundle["in_size"],
+        "out_size": bundle["out_size"],
+        "widths": bundle["widths"],
+        "activations": bundle["activations"],
+        "weights": [np.asarray(w).tolist() for w in bundle["weights"]],
+        "biases": [np.asarray(b).tolist() for b in bundle["biases"]],
+        "scaler": _scaler_to_lists(bundle["scaler"]),
+        "input_bounds": bundle["input_bounds"],
+        "io_names": bundle["io_names"],
+    }
+    with open(path, "w") as f:
+        json.dump(payload, f, indent=2)
+    return path
+
+
+def _export_omlt(bundle: dict):
+    """Build an OMLT NetworkDefinition with the scaler as an OffsetScaling."""
+    try:
+        from omlt.neuralnet import NetworkDefinition
+        from omlt.neuralnet.layer import DenseLayer, InputLayer
+        from omlt.scaling import OffsetScaling
+    except ImportError as e:  # pragma: no cover - exercised only without omlt
+        raise ImportError(
+            "OMLT export needs the optional 'omlt' extra: pip install 'sindae[omlt]'"
+        ) from e
+
+    sc = bundle["scaler"]
+    input_mean = np.asarray(sc["input_mean"])
+    input_std = np.asarray(sc["input_std"])
+    scaler = OffsetScaling(
+        offset_inputs=input_mean.tolist(),
+        factor_inputs=input_std.tolist(),
+        offset_outputs=np.asarray(sc["output_mean"]).tolist(),
+        factor_outputs=np.asarray(sc["output_std"]).tolist(),
+    )
+
+    scaled_bounds = None
+    if bundle["input_bounds"] is not None:
+        scaled_bounds = {
+            i: (float((lo - input_mean[i]) / input_std[i]),
+                float((hi - input_mean[i]) / input_std[i]))
+            for i, (lo, hi) in enumerate(bundle["input_bounds"])
+        }
+
+    net_def = NetworkDefinition(scaling_object=scaler,
+                                scaled_input_bounds=scaled_bounds)
+    input_layer = InputLayer([bundle["in_size"]])
+    net_def.add_layer(input_layer)
+
+    sizes = [bundle["in_size"], *bundle["widths"], bundle["out_size"]]
+    # Hidden layers carry their activation; the output layer is linear (None).
+    activations = [*bundle["activations"], None]
+    prev = input_layer
+    for k, (w, b, act) in enumerate(
+        zip(bundle["weights"], bundle["biases"], activations)
+    ):
+        # Equinox Linear stores (out, in); OMLT DenseLayer wants (in, out).
+        dense = DenseLayer(
+            [sizes[k]], [sizes[k + 1]],
+            weights=np.asarray(w).T, biases=np.asarray(b), activation=act,
+        )
+        net_def.add_layer(dense)
+        net_def.add_edge(prev, dense)
+        prev = dense
+    return net_def
+
+
+class _ScaledMLP(eqx.Module):
+    """Wraps a SimpleMLP with its scaler so the graph is raw-in / raw-out.
+
+    Applies the same affine maps the Pyomo model embeds around the network
+    (``x_norm = (x - input_mean) / input_std`` on the way in,
+    ``y = output_mean + output_std * y_norm`` on the way out), so exporting this
+    module bakes the scaler into the ONNX graph as affine ops.
+    """
+
+    net: SimpleMLP
+    input_mean: jax.Array
+    input_std: jax.Array
+    output_mean: jax.Array
+    output_std: jax.Array
+
+    def __init__(self, net: SimpleMLP, scaler: dict):
+        import jax.numpy as jnp
+
+        self.net = net
+        self.input_mean = jnp.asarray(scaler["input_mean"])
+        self.input_std = jnp.asarray(scaler["input_std"])
+        self.output_mean = jnp.asarray(scaler["output_mean"])
+        self.output_std = jnp.asarray(scaler["output_std"])
+
+    def __call__(self, x):  # x is ONE raw physical sample, like SimpleMLP
+        x = (x - self.input_mean) / self.input_std
+        y = self.net(x)
+        return self.output_mean + self.output_std * y
+
+
+def _export_onnx(bundle: dict, net: SimpleMLP, path, scaled: bool = False) -> str:
+    """Write the network graph plus a scaler sidecar JSON.
+
+    ``scaled=False`` writes the bare network (normalized space); ``scaled=True``
+    included the scaler into the graph (raw physical in/out).  The sidecar records
+    which contract applies via the ``"scaling"`` field so a consumer never
+    double-applies the scaler.
+    """
+    if path is None:
+        raise ValueError("onnx export needs a path")
+    try:
+        from jax2onnx import to_onnx
+    except ImportError as e:  # pragma: no cover - exercised only without jax2onnx
+        raise ImportError(
+            "ONNX export needs the optional 'onnx' extra: pip install 'sindae[onnx]'"
+        ) from e
+
+    fn = _ScaledMLP(net, bundle["scaler"]) if scaled else net
+    to_onnx(
+        fn=fn,
+        inputs=[("B", bundle["in_size"])],
+        enable_double_precision=True,
+        return_mode="file",
+        output_path=str(path),
+    )
+    sidecar = str(path) + ".json"
+    with open(sidecar, "w") as f:
+        json.dump(
+            {
+                "scaling": "internal" if scaled else "external",
+                "scaler": _scaler_to_lists(bundle["scaler"]),
+                "input_bounds": bundle["input_bounds"],
+                "io_names": bundle["io_names"],
+            },
+            f, indent=2,
+        )
+    return path
 
 
 

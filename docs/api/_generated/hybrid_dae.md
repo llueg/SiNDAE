@@ -111,7 +111,7 @@ fresh ``fit`` but cannot reproduce the original solve bit-for-bit.
 #### `load`
 
 ```python
-load(cls, path) -> 'HybridDAE'
+load(cls, path, verbose = False) -> 'HybridDAE'
 ```
 
 Reconstruct a fitted :class:`HybridDAE` from a :meth:`save` file.
@@ -126,6 +126,7 @@ default configs.
 
 - **`cls`**
 - **`path`** — A file written by :meth:`save`.
+- **`verbose`** (default `False`) — Prints the loaded model information contained in the manifest.
 
 **Returns**
 
@@ -135,13 +136,55 @@ default configs.
 #### `export`
 
 ```python
-export(path = 'exported_models/', format = 'ONNX')
+export(path = None, format: Optional[str] = None, scaled: bool = False) -> str
 ```
 
-Export the trained NN into ONNX, or json format with the scaler and IO 
-contract based on the model pyomo model.
+Export the trained network to a file for a foreign optimization tool.
+
+Unlike :meth:`save` (which round-trips back into SiNDAE), ``export`` is a
+one-way handoff.  Two file targets, both carrying the scaler so the
+network is evaluated in the space it was trained in:
+
+* ``'onnx'`` — writes the network graph to ``path`` and a ``<path>.json``
+  sidecar with the scaler, input bounds, and IO contract.  By default
+  (``scaled=False``) the graph is in normalized space and the scaler is
+  kept out of it, because every OMLT loader applies the scaler
+  separately.  With ``scaled=True`` the four normalization vectors are
+  baked into the graph as affine layers, so the exported model consumes
+  raw physical inputs and returns raw physical outputs (self-contained
+  inference in any ONNX runtime, no sidecar arithmetic).  Needs the
+  ``onnx`` extra.
+* ``'json'`` — writes the whole bundle (weights, activations, scaler,
+  bounds, IO contract) as plain text.  No optional dependencies.
+
+For an in-memory OMLT model (not a file), use :meth:`to_omlt`.
 
 **Parameters**
 
-- **`path`** (default `'exported_models/'`)
-- **`format`** (default `'ONNX'`)
+- **`path`** (default `None`) — Output file. When ``format`` is omitted the target is inferred from the suffix (``.onnx`` / ``.json``).
+- **`format`** (`Optional[str]`, default `None`) — ``'onnx'`` or ``'json'``. Required when ``path`` has no recognized suffix.
+- **`scaled`** (`bool`, default `False`) — ONNX only. When ``True``, bake the scaler into the exported graph so it maps raw physical inputs to raw physical outputs. Rejected for ``'json'`` export (whose bundle always carries the scaler verbatim).
+
+**Returns**
+
+- (`str`) — The written path.
+
+(sindae.hybrid_dae.HybridDAE.to_omlt)=
+#### `to_omlt`
+
+```python
+to_omlt()
+```
+
+Build an in-memory OMLT model of the trained network.
+
+Returns an ``omlt.neuralnet.NetworkDefinition`` with the normalization
+attached as an ``OffsetScaling`` (so the OMLT block's inputs/outputs are
+the raw physical variables, not normalized ones) and the data-derived
+input bounds as its ``scaled_input_bounds``.  Feed it to an OMLT
+formulation (e.g. ``FullSpaceSmoothNNFormulation``) inside your own
+optimization model.  Needs the ``omlt`` extra.
+
+**Returns**
+
+- (`omlt.neuralnet.NetworkDefinition`)
