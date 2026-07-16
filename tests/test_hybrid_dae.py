@@ -499,7 +499,7 @@ def test_export_onnx_matches_jax(tmp_path):
 def test_export_onnx_scaled_bakes_scaler(tmp_path):
     """With scaled=True the ONNX graph consumes RAW physical inputs and returns
     RAW physical outputs: it reproduces normalize -> net -> denormalize end to
-    end (external oracle), and the sidecar marks the scaling as baked in."""
+    end (external oracle), and the sidecar marks the scaling as internal."""
     import json
 
     import jax.numpy as jnp
@@ -513,7 +513,7 @@ def test_export_onnx_scaled_bakes_scaler(tmp_path):
     sidecar = tmp_path / "m_scaled.onnx.json"
     assert sidecar.exists()
     meta = json.loads(sidecar.read_text())
-    assert meta["scaling"] == "baked"
+    assert meta["scaling"] == "internal"
 
     sess = ort.InferenceSession(str(path))
     iname = sess.get_inputs()[0].name
