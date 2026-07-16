@@ -344,8 +344,5 @@ def _unfix_nn_inputs_and_outputs(m: pyo.ConcreteModel, problem: ProblemDefinitio
                 v.fixed = False
 
 def _add_dual_suffixes(model):
-    model.ipopt_zL_out = pyo.Suffix(direction=pyo.Suffix.IMPORT)
-    model.ipopt_zU_out = pyo.Suffix(direction=pyo.Suffix.IMPORT)
-    model.ipopt_zL_in = pyo.Suffix(direction=pyo.Suffix.EXPORT)
-    model.ipopt_zU_in = pyo.Suffix(direction=pyo.Suffix.EXPORT)
+    # Constraint multipliers. Both POUNCE and IPOPT populate this after a solve.
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
