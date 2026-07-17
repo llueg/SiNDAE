@@ -167,18 +167,22 @@ def build_decomp_model(
 
     @m.Objective()
     def obj(mo):
-        data_fit    = build_data_fit_expr(mo, num_traj, traj_t_sorted, traj_norm_target, obs_dim)
+        # Sum (chi-squared) convention: plain sum of squared errors over all
+        # observed points, matching sum_s phi^(s) in Lueg et al. 2025. The slack
+        # penalty is summed on the same footing so slack_coef keeps its meaning.
+        data_fit    = build_data_fit_expr(
+            mo, num_traj, traj_t_sorted, traj_norm_target, obs_dim, reduction="sum"
+        )
         total_slack = 0.0
         for ii in range(num_traj):
             block  = mo.trajectories[ii]
             t_s    = traj_t_sorted[ii]
             sp_var = getattr(block, NN_SLACK_POS_NAME)
             sn_var = getattr(block, NN_SLACK_NEG_NAME)
-            n_slack = len(t_s) * output_dim
             total_slack += pyo.quicksum(
                 sp_var[t, k] + sn_var[t, k]
                 for t in t_s for k in range(output_dim)
-            ) / n_slack
+            )
         return data_fit + mo.slack_coef * total_slack
 
     return m, gbm
