@@ -37,6 +37,7 @@ dependencies = [
     "pounce-solver>=0.4",
     "feral-solver>=0.9",
     "matplotlib>=3.7",
+    "tabulate>=0.10.0"
 ]
 
 [project.optional-dependencies]

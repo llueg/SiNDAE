@@ -35,12 +35,14 @@ def _mlp(in_size=2, out_size=1, widths=(8, 8)):
                      [jax.nn.softplus] * len(widths), key=jax.random.PRNGKey(0))
 
 
-def _observed_problem(nfe=15, ncp=2):
+def _observed_problem(nfe=15, ncp=2, num_traj=1):
     """Small Leslie-Gower problem with generated observations."""
     from sindae import generate_data
     from sindae.example_problems import LeslieGowerProblem
 
-    problem = LeslieGowerProblem(nfe=nfe, ncp=ncp)
+    ics = np.array([[1.0 - 0.01*i, 0.1 - 0.01*i] for i in range(num_traj)])
+
+    problem = LeslieGowerProblem(ics=ics, nfe=nfe, ncp=ncp)
     data = generate_data(problem, noise_std=np.array([0.02, 0.02]),
                          obs_every=4, seed=0)
     assert data is not None, "data generation (true-model solve) failed"
@@ -600,6 +602,146 @@ def test_export_omlt_after_fit_and_load_captures_io_names(tmp_path):
     reloaded.export(json_path)
     assert json.loads(json_path.read_text())["io_names"] == model.io_names
 
+
+# ---------------------------------------------------------------------------
+# Evaluate: metrics reported by fit(metrics=...) / predict(eval_metrics=...)
+#
+# The solver stages are stubbed so no NLP runs; a synthetic InstanceData with
+# integer-valued per-state errors drives the metric computation, and the
+# printed tables are checked against hand-computed values (external oracle)
+# rendered through the same tabulate call, so only the metric values are under
+# test, not the formatting.
+# ---------------------------------------------------------------------------
+
+class _OptimalModel:
+    """A stand-in solved model that reports an optimal termination."""
+
+    class _Result:
+        class solver:
+            termination_condition = "optimal"
+
+    _solver_result = _Result()
+
+
+def _metrics_fixture():
+    """A problem + predicted InstanceData with hand-computed metrics.
+
+    Two trajectories on a 4-point collocation grid ``[0, 1, 2, 3]`` observed at
+    ``[0, 2]``.  The predicted values at the observed points differ from the
+    observations by integer amounts, so every metric is exact:
+
+        traj_0 errors  x_0: [-1,  1]   x_1: [-2, -2]
+        traj_1 errors  x_0: [-3,  3]   x_1: [ 0,  0]
+
+    giving MSE/RMSE/MAE tables that are integer per state and trajectory.
+    """
+    from sindae import InstanceData, TrajectoryData
+    from sindae.example_problems import LeslieGowerProblem
+
+    problem = LeslieGowerProblem(ics=np.array([[1.0, 0.1], [0.9, 0.09]]),
+                                 nfe=15, ncp=2)      # 2 traj, input_dim=2, z_dim=1
+    problem.obs_times = [np.array([0.0, 2.0]), np.array([0.0, 2.0])]
+    problem.obs_values = [
+        np.array([[1.0, 2.0], [3.0, 4.0]]),
+        np.array([[10.0, 20.0], [30.0, 40.0]]),
+    ]
+
+    def _traj(obs_colloc):
+        # Only sampling_times and obs feed the metric path; the rest is filler.
+        return TrajectoryData(
+            sampling_times=np.array([0.0, 1.0, 2.0, 3.0]),
+            nn_input=np.zeros((4, 2)),
+            nn_output=np.zeros((4, 1)),
+            obs=np.asarray(obs_colloc),
+        )
+
+    # Rows at t=1 and t=3 are masked out (not observed) -> value irrelevant.
+    data = InstanceData([
+        _traj([[2.0, 4.0], [99.0, 99.0], [2.0, 6.0], [99.0, 99.0]]),
+        _traj([[13.0, 20.0], [99.0, 99.0], [27.0, 40.0], [99.0, 99.0]]),
+    ])
+
+    expected = {
+        "mse":  np.array([[1.0, 4.0], [9.0, 0.0]]),
+        "rmse": np.array([[1.0, 2.0], [3.0, 0.0]]),
+        "mae":  np.array([[1.0, 2.0], [3.0, 0.0]]),
+    }
+    return problem, data, expected
+
+
+def _assert_metric_tables(out, problem, expected, order):
+    """Every requested metric prints a table matching the hand-computed oracle."""
+    from tabulate import tabulate
+
+    assert "=== Per Trajectory Metrics ===" in out
+    row_labels = np.asarray(
+        [[f"traj_{i}"] for i in range(problem.num_trajectories)]
+    )
+    for name in order:
+        assert f"{name.upper()}: " in out
+        block = tabulate(
+            np.hstack((row_labels, expected[name])),
+            headers=[f"x_{i}" for i in range(problem.obs_dim)],
+            tablefmt="fancy_grid",
+        )
+        assert block in out
+
+
+def test_train_metrics(monkeypatch, capsys):
+    """fit(metrics=[...]) prints a correct per-trajectory table for each metric,
+    computed from trained_data, and rejects an unknown metric name."""
+    import sindae.hybrid_dae as hd
+    from sindae import HybridDAE, SimultaneousConfig
+
+    problem, data, expected = _metrics_fixture()
+    mlp = _mlp()  # 2 -> 1, matches the problem
+
+    monkeypatch.setattr(hd, "solve_smoother", lambda *a, **k: _OptimalModel())
+    monkeypatch.setattr(hd, "extract_instance_data", lambda *a, **k: data)
+    monkeypatch.setattr(hd, "_capture_io_names", lambda *a, **k: None)
+    monkeypatch.setattr(hd, "pretrain_mlp", lambda mlp, d, cfg: mlp)
+    monkeypatch.setattr(hd, "solve_simultaneous",
+                        lambda *a, **k: (_OptimalModel(), mlp))
+
+    order = ["rmse", "mae", "mse"]
+    model = HybridDAE(net=mlp, train=SimultaneousConfig(reg_coef=1e-3))
+    fitted = model.fit(problem, metrics=order)
+    assert fitted is model
+
+    _assert_metric_tables(capsys.readouterr().out, problem, expected, order)
+
+    # An unknown metric name is rejected (before any solve).
+    with pytest.raises(ValueError, match="not available"):
+        HybridDAE(net=_mlp()).fit(problem, metrics=["rmse", "bogus"])
+
+
+def test_predict_metrics(monkeypatch, capsys):
+    """predict(eval_metrics=[...]) prints a correct per-trajectory table computed
+    from the inference data, and refuses a problem carrying no observations."""
+    import sindae.hybrid_dae as hd
+    from sindae import HybridDAE
+    from sindae.example_problems import LeslieGowerProblem
+
+    problem, data, expected = _metrics_fixture()
+    mlp = _mlp()
+
+    monkeypatch.setattr(hd, "solve_inference", lambda *a, **k: _OptimalModel())
+    monkeypatch.setattr(hd, "extract_instance_data", lambda *a, **k: data)
+
+    model = HybridDAE(net=mlp)
+    model._net = mlp             # pretend fitted
+    model.smoother_data = "sd"
+
+    order = ["rmse", "mse", "mae"]
+    pred = model.predict(problem, eval_metrics=order)
+    assert pred is data
+
+    _assert_metric_tables(capsys.readouterr().out, problem, expected, order)
+
+    # eval_metrics on a problem with no observations is refused.
+    bare = LeslieGowerProblem(ics=np.array([[1.2, 0.15]]), nfe=15, ncp=2)
+    with pytest.raises(ValueError, match="obs"):
+        model.predict(bare, eval_metrics=["rmse"])
 
 # ---------------------------------------------------------------------------
 # End-to-end (POUNCE/FERAL default stack)
