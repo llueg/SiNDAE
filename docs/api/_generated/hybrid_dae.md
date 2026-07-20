@@ -5,7 +5,17 @@
 ### `HybridDAE`
 
 ```python
-class HybridDAE(method: str = 'simultaneous', nlp_solver: str = 'pounce', linear_solver: str = 'feral', net: Optional[SimpleMLP] = None, smoother: Optional[SmootherConfig] = None, pretrain: Optional[PretrainConfig] = None, train: Union[SimultaneousConfig, DecompConfig, None] = None, solver_options: Optional[SolverConfig] = None, unfix_io: bool = True)
+class HybridDAE(
+    method: str = 'simultaneous',
+    nlp_solver: str = 'pounce',
+    linear_solver: str = 'feral',
+    net: Optional[SimpleMLP] = None,
+    smoother: Optional[SmootherConfig] = None,
+    pretrain: Optional[PretrainConfig] = None,
+    train: Union[SimultaneousConfig, DecompConfig, None] = None,
+    solver_options: Optional[SolverConfig] = None,
+    unfix_io: bool = True,
+)
 ```
 
 scikit-learn-style facade over the SiNDAE training pipeline.
@@ -40,7 +50,11 @@ silently override them.
 #### `fit`
 
 ```python
-fit(problem: ProblemDefinition, tee: bool = False) -> 'HybridDAE'
+fit(
+    problem: ProblemDefinition,
+    metrics: Optional[list[str]] = None,
+    tee: bool = False,
+) -> 'HybridDAE'
 ```
 
 Run the training pipeline on ``problem`` and return ``self``.
@@ -54,6 +68,7 @@ termination condition lands on ``self.termination``.
 **Parameters**
 
 - **`problem`** (`ProblemDefinition`) — Must carry observations (``obs_times`` / ``obs_values``), set directly or via :func:`generate_data`.
+- **`metrics`** (`Optional[list[str]]`, default `None`) — List of metrics to be printed after training. Comparisons per state variable, per trajectory. Options: `mse`, `rmse`, `mae`.
 - **`tee`** (`bool`, default `False`) — Stream solver output to stdout (simultaneous method only).
 
 **Returns**
@@ -64,7 +79,13 @@ termination condition lands on ``self.termination``.
 #### `predict`
 
 ```python
-predict(problem: ProblemDefinition, slack_coef: float = 0.0, solver_options: Optional[SolverConfig] = None, tee: bool = False) -> InstanceData
+predict(
+    problem: ProblemDefinition,
+    slack_coef: float = 0.0,
+    solver_options: Optional[SolverConfig] = None,
+    eval_metrics: Optional[list[str]] = None,
+    tee: bool = False,
+) -> InstanceData
 ```
 
 Embed the trained network in ``problem`` and solve the inference NLP.
@@ -76,9 +97,10 @@ a non-optimal solve raises a ``UserWarning``.
 
 **Parameters**
 
-- **`problem`** (`ProblemDefinition`) — The problem to predict, e.g. the training system with new initial conditions. Observations are not required.
+- **`problem`** (`ProblemDefinition`) — The problem to predict, e.g. the training system with new initial conditions. Observations are not required unless ``eval_metrics`` is set.
 - **`slack_coef`** (`float`, default `0.0`) — 0 (default) enforces the NN equality as a hard constraint; > 0 relaxes it with l1 slack variables (see :func:`solve_inference`).
 - **`solver_options`** (`Optional[SolverConfig]`, default `None`) — NLP solver options for this inference solve. Defaults to the solver's own defaults (independent of the constructor's fit-time ``solver_options``), so a bare ``predict`` matches a bare :func:`solve_inference` call.
+- **`eval_metrics`** (`Optional[list[str]]`, default `None`) — Metrics to print, comparing the prediction against ``problem``'s observations per state variable and trajectory. Options: ``mse``, ``rmse``, ``mae``. Requires ``problem`` to carry observations.
 - **`tee`** (`bool`, default `False`) — Stream solver output to stdout.
 
 **Returns**
@@ -111,7 +133,7 @@ fresh ``fit`` but cannot reproduce the original solve bit-for-bit.
 #### `load`
 
 ```python
-load(cls, path, verbose = False) -> 'HybridDAE'
+load(cls, path: str, verbose: bool = False) -> 'HybridDAE'
 ```
 
 Reconstruct a fitted :class:`HybridDAE` from a :meth:`save` file.
@@ -125,8 +147,8 @@ default configs.
 **Parameters**
 
 - **`cls`**
-- **`path`** — A file written by :meth:`save`.
-- **`verbose`** (default `False`) — Prints the loaded model information contained in the manifest.
+- **`path`** (`str`) — A file written by :meth:`save`.
+- **`verbose`** (`bool`, default `False`) — Prints the loaded model information contained in the manifest.
 
 **Returns**
 
@@ -155,7 +177,8 @@ network is evaluated in the space it was trained in:
   inference in any ONNX runtime, no sidecar arithmetic).  Needs the
   ``onnx`` extra.
 * ``'json'`` — writes the whole bundle (weights, activations, scaler,
-  bounds, IO contract) as plain text.  No optional dependencies.
+  bounds, IO contract) as plain text. Only use for very small MLPs since 
+  storing many weights may lead to large file sizes.
 
 For an in-memory OMLT model (not a file), use :meth:`to_omlt`.
 

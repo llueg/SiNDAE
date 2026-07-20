@@ -427,7 +427,8 @@ class HybridDAE:
         ----------
         problem : ProblemDefinition
             The problem to predict, e.g. the training system with new initial
-            conditions.  Observations are not required.
+            conditions.  Observations are not required unless ``eval_metrics``
+            is set.
         slack_coef : float
             0 (default) enforces the NN equality as a hard constraint; > 0
             relaxes it with l1 slack variables (see :func:`solve_inference`).
@@ -436,6 +437,10 @@ class HybridDAE:
             solver's own defaults (independent of the constructor's fit-time
             ``solver_options``), so a bare ``predict`` matches a bare
             :func:`solve_inference` call.
+        eval_metrics : Optional[list[str]]
+            Metrics to print, comparing the prediction against ``problem``'s
+            observations per state variable and trajectory.  Options: ``mse``,
+            ``rmse``, ``mae``.  Requires ``problem`` to carry observations.
         tee : bool
             Stream solver output to stdout.
 
@@ -857,16 +862,31 @@ def _export_onnx(bundle: dict, net: SimpleMLP, path, scaled: bool = False) -> st
 # at the top of this file
 # --------------------------------------------------------------------------- #
 
-def _filter_data_from_collocation_points(problem: ProblemDefinition, data: InstanceData) -> tuple[np.ndarray, np.ndarray]:
-    t = problem.obs_times  
-    tc = data.sampling_times
-    pred_values_colloc = data.obs
+def _filter_data_from_collocation_points(problem: ProblemDefinition, data: InstanceData) -> tuple[list, list]:
+    """Evaluate the predicted observed states at the observation times.
 
-    masks = [np.isin(tc[i], t[i]) for i, _ in enumerate(pred_values_colloc)]
+    The prediction lives on the trained collocation grid
+    (``data.sampling_times``), which need not coincide with ``problem.obs_times``:
+    training is routinely re-discretized to a different grid than the data was
+    generated on.  For each trajectory the predicted observed states are
+    therefore linearly interpolated onto the observation times, so the returned
+    prediction lines up with ``problem.obs_values`` row-for-row regardless of
+    grid.  When the observation times already fall on the collocation grid the
+    interpolation is exact (returns the node values).
+    """
+    obs_times = problem.obs_times
+    sampling_times = data.sampling_times
+    pred_colloc = data.obs
 
-    pred_values = [traj[masks[i]] for i, traj in enumerate(pred_values_colloc)]
+    pred_at_obs = [
+        np.column_stack([
+            np.interp(obs_times[i], sampling_times[i], traj[:, k])
+            for k in range(traj.shape[1])
+        ])
+        for i, traj in enumerate(pred_colloc)
+    ]
 
-    return problem.obs_values, pred_values
+    return problem.obs_values, pred_at_obs
 
 def _compute_mse(x: list[np.ndarray], x_hat: list[np.ndarray]) -> np.ndarray:
     return np.array([list(np.mean((x_i - x_hat_i)**2, axis=0))

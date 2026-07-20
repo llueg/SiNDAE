@@ -5,7 +5,14 @@
 ### `SimpleMLP`
 
 ```python
-class SimpleMLP(in_size: int, out_size: int, widths: List[int], activations: List[Callable], *, key: jax.Array = jax.random.PRNGKey(0))
+class SimpleMLP(
+    in_size: int,
+    out_size: int,
+    widths: List[int],
+    activations: List[Callable],
+    *,
+    key: jax.Array = jax.random.PRNGKey(0),
+)
 ```
 
 **Parameters**

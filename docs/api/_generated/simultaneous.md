@@ -20,7 +20,15 @@ Hyperparameters for the simultaneous (single-NLP) training approach.
 ### `build_simultaneous_model`
 
 ```python
-build_simultaneous_model(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: List[int], data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, reg_coef: float = 0.0, unfix_io: bool = True) -> pyo.ConcreteModel
+build_simultaneous_model(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    traj_indices: List[int],
+    data: InstanceData,
+    smoother_model: Optional[pyo.ConcreteModel] = None,
+    reg_coef: float = 0.0,
+    unfix_io: bool = True,
+) -> pyo.ConcreteModel
 ```
 
 Build a simultaneous NLP using expression-writing.
@@ -48,7 +56,15 @@ yielding exact second-order information (Hessian available for IPOPT).
 ### `build_simultaneous_model_gbm`
 
 ```python
-build_simultaneous_model_gbm(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: List[int], data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, reg_coef: float = 0.0, unfix_io: bool = True) -> pyo.ConcreteModel
+build_simultaneous_model_gbm(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    traj_indices: List[int],
+    data: InstanceData,
+    smoother_model: Optional[pyo.ConcreteModel] = None,
+    reg_coef: float = 0.0,
+    unfix_io: bool = True,
+) -> pyo.ConcreteModel
 ```
 
 Build a simultaneous NLP using the grey-box (GBM) formulation.
@@ -100,7 +116,19 @@ and the GBM path (reads flat Pyomo Var values).
 ### `solve_simultaneous`
 
 ```python
-solve_simultaneous(problem: ProblemDefinition, mlp: SimpleMLP, cfg: SimultaneousConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, solver_options: Optional[dict] = None, nlp_solver: Optional[str] = None, traj_indices: Optional[List[int]] = None, tee: bool = False, timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP]
+solve_simultaneous(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    cfg: SimultaneousConfig,
+    data: InstanceData,
+    smoother_model: Optional[pyo.ConcreteModel] = None,
+    solver_options: Optional[dict] = None,
+    nlp_solver: Optional[str] = None,
+    traj_indices: Optional[List[int]] = None,
+    tee: bool = False,
+    timer: Optional[HierarchicalTimer] = None,
+    unfix_io: bool = True,
+) -> Tuple[pyo.ConcreteModel, SimpleMLP]
 ```
 
 Build and solve the simultaneous NLP, returning the solved model and

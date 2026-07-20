@@ -5,7 +5,18 @@
 ### `ProblemDefinition`
 
 ```python
-class ProblemDefinition(ics: np.ndarray, input_dim: int, z_dim: int, t_span: tuple, nfe: int, ncp: int, obs_times: Optional[List[np.ndarray]] = None, obs_values: Optional[List[np.ndarray]] = None, obs_dim: Optional[int] = None, aux_vars_dim: Optional[int] = None)
+class ProblemDefinition(
+    ics: np.ndarray,
+    input_dim: int,
+    z_dim: int,
+    t_span: tuple,
+    nfe: int,
+    ncp: int,
+    obs_times: Optional[List[np.ndarray]] = None,
+    obs_values: Optional[List[np.ndarray]] = None,
+    obs_dim: Optional[int] = None,
+    aux_vars_dim: Optional[int] = None,
+)
 ```
 
 Base class for a Neural DAE problem.

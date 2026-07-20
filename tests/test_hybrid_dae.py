@@ -743,6 +743,70 @@ def test_predict_metrics(monkeypatch, capsys):
     with pytest.raises(ValueError, match="obs"):
         model.predict(bare, eval_metrics=["rmse"])
 
+
+def test_metric_filter_interpolates_offgrid_obs_times():
+    """The metric filter evaluates the prediction AT the observation times by
+    interpolation, so metrics work when the observation times do not fall on the
+    trained collocation grid.
+
+    This is the realistic case: training is routinely re-discretized to a
+    different grid than the data was generated on (the gallery notebooks do
+    exactly this), so ``obs_times`` are generally not a subset of the trained
+    ``sampling_times``.  Oracle: hand-computed linear interpolation.
+    """
+    import sindae.hybrid_dae as hd
+    from sindae import InstanceData, TrajectoryData
+    from sindae.example_problems import LeslieGowerProblem
+
+    problem = LeslieGowerProblem(ics=np.array([[1.0, 0.1]]), nfe=15, ncp=2)
+    # obs_times deliberately OFF the trained collocation grid [0, 1, 2, 3, 4].
+    problem.obs_times = [np.array([0.5, 2.5])]
+    problem.obs_values = [np.array([[100.0, 200.0], [300.0, 400.0]])]
+
+    # Predicted observed states on the trained grid: dim0 = 10 t, dim1 = 100 t.
+    st = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    obs_colloc = np.column_stack([10.0 * st, 100.0 * st])   # (5, 2)
+    data = InstanceData([TrajectoryData(
+        sampling_times=st,
+        nn_input=np.zeros((5, 2)),
+        nn_output=np.zeros((5, 1)),
+        obs=obs_colloc,
+    )])
+
+    x, x_hat = hd._filter_data_from_collocation_points(problem, data)
+
+    # Oracle: linear interpolation at t = 0.5 and t = 2.5
+    #   dim0: 10*0.5 = 5,   10*2.5 = 25
+    #   dim1: 100*0.5 = 50, 100*2.5 = 250
+    assert len(x_hat) == 1
+    assert x_hat[0].shape == problem.obs_values[0].shape == (2, 2)
+    np.testing.assert_allclose(x_hat[0], np.array([[5.0, 50.0], [25.0, 250.0]]))
+    np.testing.assert_array_equal(x[0], problem.obs_values[0])
+
+
+def test_metric_filter_aligned_grid_returns_node_values():
+    """When the observation times DO fall on the trained grid, interpolation is
+    exact (returns the node values), so the aligned case is unchanged.
+    """
+    import sindae.hybrid_dae as hd
+    from sindae import InstanceData, TrajectoryData
+    from sindae.example_problems import LeslieGowerProblem
+
+    problem = LeslieGowerProblem(ics=np.array([[1.0, 0.1]]), nfe=15, ncp=2)
+    problem.obs_times = [np.array([0.0, 2.0])]
+    problem.obs_values = [np.array([[0.0, 0.0], [0.0, 0.0]])]
+
+    st = np.array([0.0, 1.0, 2.0, 3.0])
+    obs_colloc = np.array([[2.0, 4.0], [99.0, 99.0], [2.0, 6.0], [99.0, 99.0]])
+    data = InstanceData([TrajectoryData(
+        sampling_times=st, nn_input=np.zeros((4, 2)),
+        nn_output=np.zeros((4, 1)), obs=obs_colloc,
+    )])
+
+    _, x_hat = hd._filter_data_from_collocation_points(problem, data)
+    np.testing.assert_array_equal(x_hat[0], np.array([[2.0, 4.0], [2.0, 6.0]]))
+
+
 # ---------------------------------------------------------------------------
 # End-to-end (POUNCE/FERAL default stack)
 # ---------------------------------------------------------------------------
