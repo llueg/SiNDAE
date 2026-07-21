@@ -5,7 +5,13 @@
 ### `TrajectoryData`
 
 ```python
-class TrajectoryData(sampling_times: np.ndarray, nn_input: np.ndarray, nn_output: np.ndarray, obs: np.ndarray, aux_vars: Optional[np.ndarray] = None)
+class TrajectoryData(
+    sampling_times: np.ndarray,
+    nn_input: np.ndarray,
+    nn_output: np.ndarray,
+    obs: np.ndarray,
+    aux_vars: Optional[np.ndarray] = None,
+)
 ```
 
 **Fields**
@@ -93,7 +99,12 @@ load_from_file(filename: str) -> InstanceData
 ### `NormStats`
 
 ```python
-class NormStats(input_mean: np.ndarray, input_std: np.ndarray, output_mean: np.ndarray, output_std: np.ndarray)
+class NormStats(
+    input_mean: np.ndarray,
+    input_std: np.ndarray,
+    output_mean: np.ndarray,
+    output_std: np.ndarray,
+)
 ```
 
 The four normalization vectors ``solve_inference`` consumes.
@@ -139,7 +150,15 @@ Iterates over ``model.traj_set``, calling ``problem.get_input_vars``,
 ### `generate_data`
 
 ```python
-generate_data(problem: ProblemDefinition, obs_every: int = 1, seed: int = 0, noise_std: Optional[np.ndarray] = None, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', tee: bool = False) -> InstanceData
+generate_data(
+    problem: ProblemDefinition,
+    obs_every: int = 1,
+    seed: int = 0,
+    noise_std: Optional[np.ndarray] = None,
+    solver_options: Optional[dict] = None,
+    nlp_solver: str = 'pounce',
+    tee: bool = False,
+) -> InstanceData
 ```
 
 Solve the true model for all trajectories and populate problem with data.

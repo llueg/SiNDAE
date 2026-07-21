@@ -5,7 +5,14 @@
 ### `SolverConfig`
 
 ```python
-class SolverConfig(tol: Optional[float] = None, max_iter: Optional[int] = None, mu_strategy: Optional[str] = None, hessian_approximation: Optional[str] = None, print_level: Optional[int] = None, extra_options: dict = dict())
+class SolverConfig(
+    tol: Optional[float] = None,
+    max_iter: Optional[int] = None,
+    mu_strategy: Optional[str] = None,
+    hessian_approximation: Optional[str] = None,
+    print_level: Optional[int] = None,
+    extra_options: dict = dict(),
+)
 ```
 
 Typed options for an NLP backend.
@@ -33,14 +40,18 @@ interchangeably with a plain dict.
 ### `make_nlp_solver`
 
 ```python
-make_nlp_solver(backend: Union[str, NLPSolver] = 'pounce', options: Union[dict, SolverConfig, None] = None) -> NLPSolver
+make_nlp_solver(
+    backend: Union[str, NLPSolver] = 'pounce',
+    options: Union[dict, SolverConfig, None] = None,
+) -> NLPSolver
 ```
 
 Build an :class:`NLPSolver` for ``backend``.
 
 ``backend`` may be a name (``"pounce"`` (default), ``"ipopt"``,
 ``"cyipopt"``; case-insensitive) or an existing :class:`NLPSolver`, which is
-returned unchanged.  ``options`` may be a plain option dict or a
+returned unchanged (``options`` are ignored in that case — a warning is
+logged if any were passed).  ``options`` may be a plain option dict or a
 :class:`SolverConfig`.
 
 **Parameters**
@@ -65,8 +76,10 @@ Build a linear / KKT solver implementing Pyomo's
 
 ``name`` may be ``"feral"`` (default), ``"ma27"``, ``"scipy"``
 (case-insensitive) or an already-constructed interface, which is returned
-unchanged.  Extra keyword arguments are forwarded to the constructor (used
-by FERAL's ``max_steps`` / ``refine_tol``).
+unchanged (keyword arguments are ignored in that case — a warning is
+logged if any were passed).  Extra keyword arguments are forwarded to the
+constructor (used by FERAL's ``max_steps`` / ``refine_tol`` /
+``residual_tol``).
 
 **Parameters**
 
@@ -104,17 +117,29 @@ model hundreds of times).
 #### `solve`
 
 ```python
-solve(model, *, tee: bool = False, extra_options: Optional[dict] = None, return_nlp: bool = False) -> NLPResult
+solve(
+    model,
+    *,
+    tee: bool = False,
+    extra_options: Optional[dict] = None,
+    return_nlp: bool = False,
+) -> NLPResult
 ```
 
-Solve ``model``, capturing IPOPT timing from a temporary log file.
+Solve ``model``, capturing solver timing from its log output.
+
+The ASL executables do not all honour IPOPT's ``output_file`` option
+(POUNCE ignores it), so on the ASL path the subprocess stdout is
+captured to a temporary file via pyomo's ``logfile=`` mechanism
+(``tee=True`` still streams to the console).  cyipopt runs in-process
+and IPOPT itself writes the log via ``output_file``.
 
 **Parameters**
 
 - **`model`**
 - **`tee`** (`bool`, default `False`) — Stream solver output to stdout.
-- **`extra_options`** (`Optional[dict]`, default `None`) — Per-call options merged onto the persistent solver before solving.
-- **`return_nlp`** (`bool`, default `False`) — Return the populated NLP alongside the results (cyipopt only; raises ``ValueError`` for backends that do not support it).
+- **`extra_options`** (`Optional[dict]`, default `None`) — Per-call options overlaid on the persistent solver options for this solve only (the persistent options are left untouched).
+- **`return_nlp`** (`bool`, default `False`) — Return the populated NLP alongside the results (raises ``ValueError`` for backends that do not support it).
 
 **Returns**
 

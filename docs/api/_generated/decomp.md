@@ -5,7 +5,21 @@
 ### `DecompConfig`
 
 ```python
-class DecompConfig(n_steps: int = 100, lr: float = 0.01, grad_clip_norm: float = np.inf, init_slack_coef: float = 100.0, slack_scale: float = 2.0, slack_update_interval: int = np.inf, max_slack_coef: float = 1000.0, mu_target: float = 1e-10, param_reg_coef: float = 0.0, subsample_frac: float = 1.0, patience: int = 0, slack_tol: float = 1e-06, lr_schedule: Optional[Callable[[int], float]] = None)
+class DecompConfig(
+    n_steps: int = 100,
+    lr: float = 0.01,
+    grad_clip_norm: float = np.inf,
+    init_slack_coef: float = 100.0,
+    slack_scale: float = 2.0,
+    slack_update_interval: int = np.inf,
+    max_slack_coef: float = 1000.0,
+    mu_target: float = 1e-10,
+    param_reg_coef: float = 0.0,
+    subsample_frac: float = 1.0,
+    patience: int = 0,
+    slack_tol: float = 1e-06,
+    lr_schedule: Optional[Callable[[int], float]] = None,
+)
 ```
 
 Hyperparameters for the decomposition (Adam + KKT gradient) training loop.
@@ -31,7 +45,18 @@ Hyperparameters for the decomposition (Adam + KKT gradient) training loop.
 ### `train_decomp`
 
 ```python
-train_decomp(problem: ProblemDefinition, mlp: SimpleMLP, cfg: DecompConfig, data: InstanceData, smoother_model: Optional[pyo.ConcreteModel] = None, mpi_comm = None, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', linear_solver: str = 'feral', unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]
+train_decomp(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    cfg: DecompConfig,
+    data: InstanceData,
+    smoother_model: Optional[pyo.ConcreteModel] = None,
+    mpi_comm = None,
+    solver_options: Optional[dict] = None,
+    nlp_solver: str = 'pounce',
+    linear_solver: str = 'feral',
+    unfix_io: bool = True,
+) -> Tuple[pyo.ConcreteModel, SimpleMLP, dict]
 ```
 
 Train a neural network via the decomposition (GBM + KKT gradient) approach.
@@ -63,7 +88,15 @@ Pretraining is NOT handled here — call ``pretrain_mlp`` from
 ### `build_decomp_model`
 
 ```python
-build_decomp_model(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: List[int], data: InstanceData, slack_coef: float = 1.0, smoother_model: Optional[pyo.ConcreteModel] = None, unfix_io: bool = True) -> Tuple[pyo.ConcreteModel, NNGreyBoxModel]
+build_decomp_model(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    traj_indices: List[int],
+    data: InstanceData,
+    slack_coef: float = 1.0,
+    smoother_model: Optional[pyo.ConcreteModel] = None,
+    unfix_io: bool = True,
+) -> Tuple[pyo.ConcreteModel, NNGreyBoxModel]
 ```
 
 Build a multi-trajectory NLP with NNGreyBoxModel for the decomposition approach.

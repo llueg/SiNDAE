@@ -23,7 +23,13 @@ values give smoother warm-start trajectories.
 ### `build_smoother_model`
 
 ```python
-build_smoother_model(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: List[int], smooth_coef: float = 1.0, unfix_io: bool = True) -> pyo.ConcreteModel
+build_smoother_model(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    traj_indices: List[int],
+    smooth_coef: float = 1.0,
+    unfix_io: bool = True,
+) -> pyo.ConcreteModel
 ```
 
 Build a multi-trajectory smoother NLP.
@@ -53,7 +59,16 @@ before ``problem.norm_stats`` is set.
 ### `solve_smoother`
 
 ```python
-solve_smoother(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: Optional[List[int]] = None, smooth_coef: float = 1.0, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', timer: Optional[HierarchicalTimer] = None, unfix_io: bool = True) -> pyo.ConcreteModel
+solve_smoother(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    traj_indices: Optional[List[int]] = None,
+    smooth_coef: float = 1.0,
+    solver_options: Optional[dict] = None,
+    nlp_solver: str = 'pounce',
+    timer: Optional[HierarchicalTimer] = None,
+    unfix_io: bool = True,
+) -> pyo.ConcreteModel
 ```
 
 Build and solve the smoother NLP, returning the solved model.

@@ -5,7 +5,13 @@
 ### `make_inference_model`
 
 ```python
-make_inference_model(problem: ProblemDefinition, mlp: SimpleMLP, traj_indices: List[int], data: InstanceData, slack_coef: float = 0.0) -> pyo.ConcreteModel
+make_inference_model(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    traj_indices: List[int],
+    data: InstanceData,
+    slack_coef: float = 0.0,
+) -> pyo.ConcreteModel
 ```
 
 Build an inference NLP: DAE + trained NN embedded as a GBM constraint.
@@ -27,7 +33,17 @@ Build an inference NLP: DAE + trained NN embedded as a GBM constraint.
 ### `solve_inference`
 
 ```python
-solve_inference(problem: ProblemDefinition, mlp: SimpleMLP, data: InstanceData, traj_indices: Optional[List[int]] = None, slack_coef: float = 0.0, solver_options: Optional[dict] = None, nlp_solver: str = 'pounce', tee: bool = False, timer: Optional[HierarchicalTimer] = None) -> pyo.ConcreteModel
+solve_inference(
+    problem: ProblemDefinition,
+    mlp: SimpleMLP,
+    data: InstanceData,
+    traj_indices: Optional[List[int]] = None,
+    slack_coef: float = 0.0,
+    solver_options: Optional[dict] = None,
+    nlp_solver: str = 'pounce',
+    tee: bool = False,
+    timer: Optional[HierarchicalTimer] = None,
+) -> pyo.ConcreteModel
 ```
 
 Build and solve the inference NLP, returning the solved model.

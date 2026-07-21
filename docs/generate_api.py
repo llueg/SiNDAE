@@ -159,15 +159,32 @@ def _signature_params(obj) -> list[str]:
     return out
 
 
+# Signatures wider than this wrap one parameter per line (Black's default line
+# length), so the rendered code block never needs horizontal scrolling.
+_MAX_SIG_WIDTH = 88
+
+
+def _format_signature(prefix: str, params: list[str], ret: str = "") -> str:
+    """Assemble ``prefix(params) ret``, wrapping Black-style when it is too wide.
+
+    Short signatures stay on one line; long ones put each parameter on its own
+    indented line with a trailing comma and keep the return annotation on the
+    closing-paren line.
+    """
+    oneline = f"{prefix}({', '.join(params)}){ret}"
+    if len(oneline) <= _MAX_SIG_WIDTH:
+        return oneline
+    body = "".join(f"    {p},\n" for p in params)
+    return f"{prefix}(\n{body}){ret}"
+
+
 def _signature(obj, is_class: bool) -> str:
-    params = ", ".join(_signature_params(obj))
+    params = _signature_params(obj)
     if is_class:
-        return f"class {obj.name}({params})"
-    sig = f"{obj.name}({params})"
+        return _format_signature(f"class {obj.name}", params)
     ret = getattr(obj, "returns", None) or getattr(obj, "annotation", None)
-    if ret is not None:
-        sig += f" -> {_clean(ret)}"
-    return sig
+    ret_str = f" -> {_clean(ret)}" if ret is not None else ""
+    return _format_signature(obj.name, params, ret_str)
 
 
 def _docstring_sections(obj) -> dict:

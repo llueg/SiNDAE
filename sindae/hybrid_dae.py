@@ -68,6 +68,7 @@ import equinox as eqx
 import jax
 import json
 import numpy as np
+from tabulate import tabulate
 
 _METHODS = ("simultaneous", "decomposition")
 _NLP_SOLVERS = ("pounce", "ipopt", "cyipopt")
@@ -295,7 +296,9 @@ class HybridDAE:
 
     # ------------------------------------------------------------------
 
-    def fit(self, problem: ProblemDefinition, tee: bool = False) -> "HybridDAE":
+    def fit(self, problem: ProblemDefinition, 
+            metrics: Optional[list[str]] = None, 
+            tee: bool = False) -> "HybridDAE":
         """Run the training pipeline on ``problem`` and return ``self``.
 
         Stages: solve the smoother, extract normalization data, pretrain the
@@ -309,6 +312,9 @@ class HybridDAE:
         problem : ProblemDefinition
             Must carry observations (``obs_times`` / ``obs_values``), set
             directly or via :func:`generate_data`.
+        metrics : Optional[list[str]]
+            List of metrics to be printed after training. Comparisons per
+            state variable, per trajectory. Options: `mse`, `rmse`, `mae`.
         tee : bool
             Stream solver output to stdout (simultaneous method only).
 
@@ -329,6 +335,14 @@ class HybridDAE:
                 "problem has no observation data: set problem.obs_times / "
                 "problem.obs_values (or call generate_data) before fit()"
             )
+        
+        if metrics:
+            for metric in metrics:
+                if metric not in _METRICS.keys():
+                    raise ValueError(
+                        f'metric: "{metric}" not available '
+                        f"please choose a metric from: {_METRICS.keys()}"
+                    )
 
         smoother_cfg = self.smoother if self.smoother is not None else SmootherConfig()
 
@@ -378,6 +392,20 @@ class HybridDAE:
         self.trained_data = extract_instance_data(problem, training_model)
         self.history = history
         self.io_names = io_names
+
+        if metrics:
+            x, x_hat = _filter_data_from_collocation_points(problem, self.trained_data)
+            row_labels = np.asarray([[f"traj_{i}"] for i in range(problem.num_trajectories)])
+            print("=== Per Trajectory Metrics ===")
+            for metric in metrics:
+                print(f"{metric.upper()}: ")    
+                metric_table = np.hstack((row_labels, _METRICS[metric](x, x_hat)))
+                print(tabulate(
+                    tabular_data=metric_table,
+                    headers=[f"x_{i}" for i in range(problem.obs_dim)],
+                    tablefmt="fancy_grid"
+                ))
+
         return self
 
     def predict(
@@ -385,6 +413,7 @@ class HybridDAE:
         problem: ProblemDefinition,
         slack_coef: float = 0.0,
         solver_options: Optional[SolverConfig] = None,
+        eval_metrics: Optional[list[str]] = None,
         tee: bool = False,
     ) -> InstanceData:
         """Embed the trained network in ``problem`` and solve the inference NLP.
@@ -398,7 +427,8 @@ class HybridDAE:
         ----------
         problem : ProblemDefinition
             The problem to predict, e.g. the training system with new initial
-            conditions.  Observations are not required.
+            conditions.  Observations are not required unless ``eval_metrics``
+            is set.
         slack_coef : float
             0 (default) enforces the NN equality as a hard constraint; > 0
             relaxes it with l1 slack variables (see :func:`solve_inference`).
@@ -407,6 +437,10 @@ class HybridDAE:
             solver's own defaults (independent of the constructor's fit-time
             ``solver_options``), so a bare ``predict`` matches a bare
             :func:`solve_inference` call.
+        eval_metrics : Optional[list[str]]
+            Metrics to print, comparing the prediction against ``problem``'s
+            observations per state variable and trajectory.  Options: ``mse``,
+            ``rmse``, ``mae``.  Requires ``problem`` to carry observations.
         tee : bool
             Stream solver output to stdout.
 
@@ -417,6 +451,13 @@ class HybridDAE:
         """
         self._check_fitted()
         _require_config(solver_options, SolverConfig, "solver_options")
+
+        if not problem.obs_values and not problem.obs_times and eval_metrics:
+            raise ValueError(
+                "evaluation metrics not available without `obs_values` or 'obs_times` "
+                "defined for `problem: ProblemDefinition` arg"
+            )
+
         if (problem.input_dim, problem.z_dim) != (self._net.in_size,
                                                   self._net.out_size):
             raise ValueError(
@@ -434,7 +475,23 @@ class HybridDAE:
         )
         self._check_solve("inference", m)
         self.inference_model = m
-        return extract_instance_data(problem, m)
+
+        inference_data = extract_instance_data(problem, m)
+
+        if eval_metrics:
+            x, x_hat = _filter_data_from_collocation_points(problem, inference_data)
+            row_labels = np.asarray([[f"traj_{i}"] for i in range(problem.num_trajectories)])
+            print("=== Per Trajectory Metrics ===")
+            for metric in eval_metrics:
+                print(f"{metric.upper()}: ")    
+                metric_table = np.hstack((row_labels, _METRICS[metric](x, x_hat)))
+                print(tabulate(
+                    tabular_data=metric_table,
+                    headers=[f"x_{i}" for i in range(problem.obs_dim)],
+                    tablefmt="fancy_grid"
+                ))
+
+        return inference_data
 
 
     def save(self, path) -> None:
@@ -477,7 +534,7 @@ class HybridDAE:
             eqx.tree_serialise_leaves(f, self._net)
 
     @classmethod
-    def load(cls, path, verbose=False) -> "HybridDAE":
+    def load(cls, path: str, verbose: bool =False) -> "HybridDAE":
         """Reconstruct a fitted :class:`HybridDAE` from a :meth:`save` file.
 
         The returned wrapper can ``predict`` immediately (the scaler is
@@ -544,7 +601,7 @@ class HybridDAE:
         """
         self._check_fitted()
         net = self._net
-        sd = self.smoother_data
+        sd = self.smoother_data 
         input_bounds = None
         if hasattr(sd, "nn_input"):  # InstanceData (not the loaded NormStats)
             stacked = np.vstack(sd.nn_input)
@@ -800,5 +857,49 @@ def _export_onnx(bundle: dict, net: SimpleMLP, path, scaled: bool = False) -> st
     return path
 
 
+# --------------------------------------------------------------------------- #
+# Eval metrics functions. New metrics should be added to the _METRICS registry
+# at the top of this file
+# --------------------------------------------------------------------------- #
 
+def _filter_data_from_collocation_points(problem: ProblemDefinition, data: InstanceData) -> tuple[list, list]:
+    """Evaluate the predicted observed states at the observation times.
 
+    The prediction lives on the trained collocation grid
+    (``data.sampling_times``), which need not coincide with ``problem.obs_times``:
+    training is routinely re-discretized to a different grid than the data was
+    generated on.  For each trajectory the predicted observed states are
+    therefore linearly interpolated onto the observation times, so the returned
+    prediction lines up with ``problem.obs_values`` row-for-row regardless of
+    grid.  When the observation times already fall on the collocation grid the
+    interpolation is exact (returns the node values).
+    """
+    obs_times = problem.obs_times
+    sampling_times = data.sampling_times
+    pred_colloc = data.obs
+
+    pred_at_obs = [
+        np.column_stack([
+            np.interp(obs_times[i], sampling_times[i], traj[:, k])
+            for k in range(traj.shape[1])
+        ])
+        for i, traj in enumerate(pred_colloc)
+    ]
+
+    return problem.obs_values, pred_at_obs
+
+def _compute_mse(x: list[np.ndarray], x_hat: list[np.ndarray]) -> np.ndarray:
+    return np.array([list(np.mean((x_i - x_hat_i)**2, axis=0))
+            for (x_i, x_hat_i) in zip(x, x_hat)])
+
+def _compute_rmse(x: list[np.ndarray], x_hat: list[np.ndarray]) -> np.ndarray:
+    return np.array([np.sqrt(np.mean((x_i - x_hat_i)**2, axis=0))
+            for (x_i, x_hat_i) in zip(x, x_hat)])
+
+def _compute_mae(x: list[np.ndarray], x_hat: list[np.ndarray]) -> np.ndarray:
+    return np.array([list(np.mean(np.abs(x_i - x_hat_i), axis=0))
+            for (x_i, x_hat_i) in zip(x, x_hat)])
+
+_METRICS = {"mse": _compute_mse, 
+            "rmse": _compute_rmse, 
+            "mae": _compute_mae}
