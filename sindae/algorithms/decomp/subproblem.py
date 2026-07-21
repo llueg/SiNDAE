@@ -44,6 +44,15 @@ from sindae.solvers import SolverConfig, make_linear_solver, make_nlp_solver
 from sindae.interfaces.interior_point_compat import InteriorPointInterface
 from sindae.interfaces.pyomo_grey_box_nlp_extended import PyomoNLPWithGreyBoxBlocksExtended
 
+# Inner-solve termination conditions at which the KKT implicit-differentiation
+# gradient is trustworthy (i.e. a genuine primal-dual solution was reached).
+_ACCEPTABLE_TERM = frozenset({
+    pyo.TerminationCondition.optimal,
+    pyo.TerminationCondition.locallyOptimal,
+    pyo.TerminationCondition.globallyOptimal,
+    pyo.TerminationCondition.feasible,
+})
+
 _logger = logging.getLogger(__name__)
 
 
@@ -188,6 +197,18 @@ class TrajectoryBatchSubproblem:
                 "lg(rg)=%s — KKT gradient may be inaccurate.",
                 _lgrg,
             )
+        # The KKT implicit-differentiation gradient is only valid at a converged
+        # primal-dual solution. If the inner NLP stalled (max_iter) or terminated
+        # infeasible, warn — the gradient handed to the outer Adam step is then
+        # computed at a non-KKT point and may be meaningless.
+        term = _res.result.solver.termination_condition
+        inner_converged = term in _ACCEPTABLE_TERM
+        if not inner_converged:
+            _logger.warning(
+                "Subproblem step: inner NLP did not converge (termination=%s); "
+                "the KKT gradient may be invalid for this step.",
+                term,
+            )
         obj = float(pyo.value(self._model.obj))
         _s('solve')
 
@@ -204,6 +225,7 @@ class TrajectoryBatchSubproblem:
             'norm_obs': norm_obs,
             'sp': sp, 'sn': sn,
             'nn_mult': nn_constr_mult,
+            'inner_converged': inner_converged,
         }
 
         # 5. Gradient function — receives norm_obs as first arg
@@ -263,10 +285,19 @@ class TrajectoryBatchSubproblem:
             out['nn_mult_max_abs']  = float(np.max(np.abs(d['nn_mult'])))
         if 'sp' in d and 'sn' in d:
             slack = np.abs(d['sp']) + np.abs(d['sn'])
-            out['slack_mean'] = float(np.mean(slack))
-            out['slack_max']  = float(np.max(slack))
+            out['slack_mean']  = float(np.mean(slack))   # per-entry, feasibility metric
+            out['slack_max']   = float(np.max(slack))
+            out['slack_total'] = float(np.sum(slack))    # matches obj's slack term (sum)
+        if 'norm_obs' in d and hasattr(self._model, '_traj_norm_target'):
+            # Human-readable fit diagnostics in standardised units (residuals are
+            # already divided by sigma), so ~1 means fitting down to the noise
+            # floor. These are reported only; the optimiser uses the sum objective.
+            resid = np.asarray(d['norm_obs']) - np.vstack(self._model._traj_norm_target)
+            out['rmse'] = float(np.sqrt(np.mean(resid ** 2)))
+            out['mae']  = float(np.mean(np.abs(resid)))
         for key in ('model_vjp_norm', 'mixed_vjp_norm',
-                    'v_bar_z_norm', 'v_bar_x_norm', 'solve_failed'):
+                    'v_bar_z_norm', 'v_bar_x_norm', 'solve_failed',
+                    'inner_converged'):
             if key in d:
                 out[key] = d[key]
         return out

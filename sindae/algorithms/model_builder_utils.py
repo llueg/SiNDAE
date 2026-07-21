@@ -156,26 +156,51 @@ def build_data_fit_expr(
     traj_t_sorted: List[List[float]],
     traj_norm_target,   # List[np.ndarray], shape (n_t, obs_dim) each
     obs_dim: int,
+    reduction: str = "mean",
 ):
     """
-    Return the normalised data-fit Pyomo expression:
+    Return the (standardised) data-fit Pyomo expression.
 
-        sum_traj  ( sum_{t,j} (norm_obs[t,j] - target[t,j])^2 / (n_t * obs_dim) )
+    ``reduction`` selects how squared residuals are aggregated:
 
-    Usable in any objective that needs a data-fit term (smoother, decomp, simultaneous).
+    - ``"sum"``: a plain sum of squared errors over every observed point,
+
+          sum_traj sum_{t,j} (norm_obs[t,j] - target[t,j])^2
+
+      This is the maximum-likelihood / weighted-least-squares objective (the
+      residuals are already divided by sigma via the norm_obs standardisation,
+      so this is chi-squared) and matches the training objective in
+      Lueg et al. 2025 (sum_s phi^(s)).  Used by the decomposition builder,
+      where the JAX gradient must match this Pyomo objective exactly.
+    - ``"mean"`` (default): each trajectory's squared error is averaged over its
+      observed points before summing across trajectories,
+
+          sum_traj ( sum_{t,j} (...)^2 / (n_t * obs_dim) )
+
+      Used by the smoother and the simultaneous builder. Both minimise the Pyomo
+      objective directly (no separate gradient to keep consistent), and the mean
+      keeps the objective O(1) — the sum is ~n_points larger and measurably slows
+      the large simultaneous NLP — while their companion weights (``smooth_coef``
+      / ``reg_coef``) are calibrated against this per-point average.
+
+    The convention only rescales the objective by a constant per trajectory and
+    does not change the minimiser, but it changes what a companion weight means,
+    so a caller and its regulariser must use a consistent choice.
     """
+    if reduction not in ("mean", "sum"):
+        raise ValueError(f"reduction must be 'mean' or 'sum', got {reduction!r}")
     total = 0.0
     for ii in range(num_traj):
         block    = m.trajectories[ii]
         t_s      = traj_t_sorted[ii]
         ntgt     = traj_norm_target[ii]
         norm_obs = getattr(block, NORM_OBS_NAME)
-        n_pts    = len(t_s) * obs_dim
-        total += pyo.quicksum(
+        sq = pyo.quicksum(
             (norm_obs[t, j] - float(ntgt[ti, j])) ** 2
             for ti, t in enumerate(t_s)
             for j in range(obs_dim)
-        ) / n_pts
+        )
+        total += sq / (len(t_s) * obs_dim) if reduction == "mean" else sq
     return total
 
 

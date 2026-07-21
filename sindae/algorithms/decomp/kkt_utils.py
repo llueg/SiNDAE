@@ -204,12 +204,17 @@ def eval_del_obj_del_rho(x, sp, sn,
 
     if subsample_frac < 1.0:
         n_pts = x.shape[0]
-        n_sel = int(n_pts * subsample_frac)
+        n_sel = max(int(n_pts * subsample_frac), 1)
         selected = jax.random.choice(key, n_pts, shape=(n_sel,), replace=False)
         mask = jnp.zeros(n_pts, dtype=bool).at[selected].set(True)
-        grad_obj_x  = jnp.where(mask[:, None], grad_obj_x,  0.0)
-        grad_obj_sp = jnp.where(mask[:, None], grad_obj_sp, 0.0)
-        grad_obj_sn = jnp.where(mask[:, None], grad_obj_sn, 0.0)
+        # Rescale the kept points by n_pts / n_sel so the subsample is an
+        # UNBIASED estimator of the full-batch gradient (E[subsampled] = full).
+        # Without this the data gradient shrinks by ~subsample_frac while the
+        # separate L2 term stays full-strength, silently inflating weight decay.
+        scale = n_pts / n_sel
+        grad_obj_x  = jnp.where(mask[:, None], grad_obj_x  * scale, 0.0)
+        grad_obj_sp = jnp.where(mask[:, None], grad_obj_sp * scale, 0.0)
+        grad_obj_sn = jnp.where(mask[:, None], grad_obj_sn * scale, 0.0)
 
     del_obj_del_rho[_x_primal_indices.flatten()]  = np.array(grad_obj_x).flatten()
     del_obj_del_rho[_sp_primal_indices.flatten()] = np.array(grad_obj_sp).flatten()

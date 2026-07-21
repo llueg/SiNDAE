@@ -84,9 +84,15 @@ def adam_step(params, m, v, grad, t, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8):
 
 def make_batch_obj_fn(m: pyo.ConcreteModel):
     """
-    Create a JAX objective matching the Pyomo objective in build_decomp_model.
+    Create the JAX objective whose gradient enters the KKT right-hand side.
 
-      f = mean((norm_obs - norm_obs_target)^2) + slack_coef * mean(|sp| + |sn|)
+    It MUST match the Pyomo objective in build_decomp_model exactly, or the
+    implicit-differentiation gradient is the gradient of a different function
+    than the one being reported and minimised.  Both use the sum (chi-squared)
+    convention — a plain sum of squared errors over all observed points, plus a
+    plain sum of the slacks:
+
+      f = sum((norm_obs - norm_obs_target)^2) + slack_coef * sum(|sp| + |sn|)
 
     Returns
     -------
@@ -95,8 +101,8 @@ def make_batch_obj_fn(m: pyo.ConcreteModel):
     norm_obs_target_jax = jnp.array(np.vstack(m._traj_norm_target))
 
     def obj_fn(norm_obs, sp, sn, slack_coef):
-        data_fit   = jnp.mean((norm_obs - norm_obs_target_jax) ** 2)
-        slack_term = jnp.mean(jnp.abs(sp) + jnp.abs(sn))
+        data_fit   = jnp.sum((norm_obs - norm_obs_target_jax) ** 2)
+        slack_term = jnp.sum(jnp.abs(sp) + jnp.abs(sn))
         return data_fit + slack_coef * slack_term
 
     return obj_fn
@@ -241,7 +247,9 @@ def train_decomp(
 
     # best_params: params with lowest data-fit among feasible steps (slack < tol).
     # If no feasible step occurs, fall back to lowest full objective.
-    best_params      = np.zeros_like(flat_params)
+    # Initialise to the incoming (pretrained) params so that a run with no
+    # feasible/improving step returns those rather than an all-zero network.
+    best_params      = flat_params.copy()
     best_data_fit    = np.inf   # tracks min data-fit (feasible steps only)
     best_obj         = np.inf   # fallback: min full objective
     stagnation_count = 0        # consecutive feasible steps with no data-fit improvement
@@ -261,10 +269,14 @@ def train_decomp(
             logger.error(f"[rank {rank}] step {step}: EXCEPTION: {e}")
             raise
 
-        # Compute data-fit component: obj = data_fit + slack_coef * slack_penalty
-        diag_i      = sub.get_diagnostics()
-        slack_mean_i = diag_i.get('slack_mean', np.inf)
-        data_fit_i   = float(obj_i) - slack_coef * float(slack_mean_i)
+        # Split obj into its data-fit and slack parts. The Pyomo objective is
+        #   obj = data_fit + slack_coef * sum(sp + sn),
+        # so we subtract the slack SUM (same reduction as the objective), not a
+        # per-point mean, to recover the data-fit exactly.
+        diag_i       = sub.get_diagnostics()
+        slack_mean_i  = diag_i.get('slack_mean',  np.inf)   # feasibility metric
+        slack_total_i = diag_i.get('slack_total', np.inf)   # matches obj's slack term
+        data_fit_i    = float(obj_i) - slack_coef * float(slack_total_i)
 
         # MPI Allreduce (no-op if serial)
         if mpi_comm is not None:
@@ -275,11 +287,10 @@ def train_decomp(
             mpi_comm.Allreduce(grad_i,                   global_grad,     op=MPI.SUM)
             mpi_comm.Allreduce(np.array([obj_i]),        global_obj,      op=MPI.SUM)
             mpi_comm.Allreduce(np.array([data_fit_i]),   global_data_fit, op=MPI.SUM)
-            # The JAX gradient is computed via jnp.mean over local time points,
-            # making it ~size× larger than the 1-rank gradient; divide to correct.
-            # The Pyomo objective is a sum of per-trajectory means, so the
-            # Allreduce SUM already gives the correct global aggregate.
-            global_grad     /= size
+            # With the sum objective, each rank contributes the gradient/objective
+            # of its own trajectories' summed loss, so Allreduce(SUM) is already
+            # the exact global aggregate regardless of how many trajectories each
+            # rank holds — no per-rank averaging (and no /size) is needed.
             global_obj       = float(global_obj[0])
             global_data_fit  = float(global_data_fit[0])
         else:
@@ -292,6 +303,11 @@ def train_decomp(
         grad_norm = float(np.linalg.norm(global_grad))
         if np.isfinite(cfg.grad_clip_norm) and grad_norm > cfg.grad_clip_norm:
             global_grad = global_grad * (cfg.grad_clip_norm / grad_norm)
+
+        # Snapshot the iterate that obj_i/data_fit_i were actually evaluated at,
+        # BEFORE Adam moves it — otherwise best_params would store the post-update
+        # point while best_data_fit records the pre-update objective.
+        params_evaluated = flat_params.copy()
 
         # Adam update — lr from schedule (if provided) or constant
         lr_t = float(cfg.lr_schedule(step)) if cfg.lr_schedule is not None else cfg.lr
@@ -322,7 +338,7 @@ def train_decomp(
         if feasible:
             if global_data_fit < best_data_fit:
                 best_data_fit = global_data_fit
-                best_params   = flat_params.copy()
+                best_params   = params_evaluated
                 stagnation_count = 0
             else:
                 stagnation_count += 1
@@ -331,7 +347,7 @@ def train_decomp(
             if global_obj < best_obj:
                 best_obj    = global_obj
                 if best_data_fit == np.inf:   # no feasible step yet
-                    best_params = flat_params.copy()
+                    best_params = params_evaluated
 
         if is_root:
             diag_history.append(diag_i)
@@ -342,8 +358,13 @@ def train_decomp(
 
         if is_root and step % 10 == 0:
             raw_norm = grad_norm / max(len(flat_params), 1)
+            # RMSE/MAE are standardised-unit fit diagnostics for readability;
+            # the objective itself is the (size-dependent) chi-squared sum.
+            _rmse = diag_i.get('rmse', float('nan'))
+            _mae  = diag_i.get('mae',  float('nan'))
             logger.info(
                 f"  step {step:4d}  obj={global_obj:.4e}  data_fit={global_data_fit:.4e}"
+                f"  rmse={_rmse:.3e}  mae={_mae:.3e}"
                 f"  slack={slack_mean_i:.2e}  |grad|={raw_norm:.2e}"
                 f"  lr={lr_t:.2e}  slack_coef={slack_coef:.1e}"
                 f"  step_s={_wall_step:.2f}"
